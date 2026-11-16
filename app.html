@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ScanInvent - Escáner</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="./css/main.css">
+</head>
+<body>
+
+  <button class="theme-toggle" id="themeToggle">
+    <i class="fa-solid fa-moon" id="themeIcon"></i>
+  </button>
+
+  <div class="dashboard-container" style="max-width: 600px; margin: 0 auto;">
+    
+    <!-- Perfil del Usuario -->
+    <div class="user-profile">
+      <img id="userAvatar" src="" alt="Avatar" class="avatar" referrerpolicy="no-referrer" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
+      <div class="user-info">
+        <strong id="userName">Cargando...</strong>
+        <span id="userEmail" class="email">...</span>
+      </div>
+      <button class="btn-logout" id="btnLogout"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+
+    <!-- Pestañas -->
+    <div class="mode-switch" style="display: flex; gap: 10px; margin-bottom: 20px;">
+      <button class="btn btn-primary" id="tabScanner" style="flex: 1;"><i class="fa-solid fa-camera"></i> Escáner</button>
+      <button class="btn btn-cancel hidden" id="tabAdmin" style="flex: 1;"><i class="fa-solid fa-users-gear"></i> Admin</button>
+    </div>
+
+    <!-- ================= PANEL ESCÁNER ================= -->
+    <div id="panelScanner">
+      <div class="card" style="padding: 15px; text-align: center;">
+        <div id="reader" style="width: 100%; border-radius: 8px; overflow: hidden; border: 2px dashed var(--border-color);"></div>
+        <button class="btn btn-primary" id="btnStartCamera" style="margin-top: 15px; width: 100%;">
+          <i class="fa-solid fa-camera"></i> Abrir Cámara
+        </button>
+      </div>
+
+      <div id="productPanel" class="card hidden" style="border-top: 4px solid var(--neon-cyan);">
+        <h3 style="color: var(--neon-cyan); margin-bottom: 15px;"><i class="fa-solid fa-box"></i> Producto Detectado</h3>
+        <p style="font-size: 0.9rem;"><strong>Código:</strong> <span id="prodCode"></span></p>
+        <p style="font-size: 1.1rem; font-weight: bold; margin-bottom: 15px;" id="prodDesc">Nombre del Producto</p>
+        
+        <div class="form-grid" style="display: flex; gap: 15px;">
+          <div class="form-group" style="flex: 1;">
+            <label>Costo Unitario</label>
+            <input type="text" id="prodCost" readonly style="background: var(--bg-hover); color: var(--neon-green); font-weight: bold;">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label>Cantidad a Levantar</label>
+            <input type="number" id="inputCantidad" min="1" value="1" style="font-size: 1.2rem; font-weight: bold; color: var(--neon-cyan);">
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 15px; background: var(--bg-hover); border-radius: 8px; text-align: center;">
+          <span style="font-size: 0.9rem; color: var(--text-gray);">Costo Total:</span>
+          <h2 style="margin: 0; color: var(--neon-green); font-size: 2rem;">$<span id="totalCost">0.00</span></h2>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn btn-cancel" id="btnCancelScan" style="flex: 1;">Cancelar</button>
+          <button class="btn btn-primary" id="btnSave" style="flex: 2; background: var(--neon-green); color: #000;">
+            <i class="fa-solid fa-floppy-disk"></i> Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= PANEL ADMINISTRADOR ================= -->
+    <div id="panelAdmin" class="hidden">
+      <div class="card">
+        <h3 style="color: var(--neon-cyan); margin-bottom: 15px;"><i class="fa-solid fa-user-clock"></i> Solicitudes Pendientes</h3>
+        <div id="requestsList" style="display: flex; flex-direction: column; gap: 10px;">
+          <p style="color: var(--text-gray);">Cargando...</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="color: var(--neon-cyan); margin-bottom: 15px;"><i class="fa-solid fa-users"></i> Usuarios Autorizados</h3>
+        <div id="usersList" style="display: flex; flex-direction: column; gap: 10px;">
+          <p style="color: var(--text-gray);">Cargando...</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="./js/config.js"></script>
+  <script src="./js/core/apiService.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./js/ui/appController.js"></script>
+  
+  <script>
+    // Modo Oscuro
+    document.addEventListener('DOMContentLoaded', () => {
+      const themeToggle = document.getElementById('themeToggle');
+      const themeIcon = document.getElementById('themeIcon');
+      if (localStorage.getItem('sw_theme') === 'light') {
+        document.body.classList.add('light-mode');
+        themeIcon.classList.replace('fa-moon', 'fa-sun');
+      }
+      themeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('light-mode');
+        const isLight = document.body.classList.contains('light-mode');
+        localStorage.setItem('sw_theme', isLight ? 'light' : 'dark');
+        themeIcon.classList.replace(isLight ? 'fa-moon' : 'fa-sun', isLight ? 'fa-sun' : 'fa-moon');
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ScanInvent | Login</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="./css/main.css">
+</head>
+<body class="login-body">
+  
+  <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
+    <i class="fa-solid fa-moon" id="themeIcon"></i>
+  </button>
+
+  <div class="login-card">
+    <div class="brand-logo">
+      <i class="fa-solid fa-barcode" style="font-size: 3rem; color: var(--neon-cyan);"></i>
+    </div>
+    
+    <h2>ScanInvent</h2>
+    <p>Control de Sobrantes y Costos</p>
+
+    <div class="google-btn-wrapper" id="googleBtnContainer">
+      <div style="color: var(--text-gray); font-size: 0.85rem;">Cargando Google Sign-In...</div>
+    </div>
+
+    <div class="remember-option">
+      <input type="checkbox" id="rememberMe">
+      <label for="rememberMe">Mantener sesión iniciada</label>
+    </div>
+
+    <div class="divider"><span>o</span></div>
+
+    <div style="margin-top: 15px;">
+      <p style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 10px;">¿No tienes acceso?</p>
+      <button class="btn btn-cancel" type="button" id="btnRequestAccess" style="width: 100%; font-size: 0.9rem;">
+        <i class="fa-solid fa-envelope"></i> Solicitar Acceso
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE SOLICITUD -->
+  <div id="modalRequest" class="hidden modal-overlay">
+    <div class="card" style="width:90%; max-width:400px;">
+      <h3 style="color: var(--neon-cyan); margin-bottom: 15px;">Solicitar Acceso</h3>
+      <div class="form-group" style="margin-bottom: 15px;">
+        <label>Correo Electrónico</label>
+        <input type="email" id="reqEmail" placeholder="tucorreo@ejemplo.com">
+      </div>
+      <div class="form-group" style="margin-bottom: 25px;">
+        <label>Nombre Completo</label>
+        <input type="text" id="reqName" placeholder="Ej: Juan Pérez">
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-cancel" id="btnCancelRequest" style="flex:1;">Cancelar</button>
+        <button class="btn btn-primary" id="btnSendRequest" style="flex:1;">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/config.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
+  <script src="./js/core/apiService.js"></script>
+  <script src="./js/auth.js"></script>
+
+  <script>
+    function initGoogleSignIn() {
+      if (typeof google === 'undefined' || !APP_CONFIG.GOOGLE_CLIENT_ID) return;
+      google.accounts.id.initialize({
+        client_id: APP_CONFIG.GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('googleBtnContainer'),
+        { type: 'standard', shape: 'pill', theme: 'outline', text: 'signin_with', size: 'large', width: 280 }
+      );
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = sessionStorage.getItem('sw_user') || localStorage.getItem('sw_user');
+      if (user) window.location.replace('app.html');
+
+      // Modal de solicitud
+      const modal = document.getElementById('modalRequest');
+      document.getElementById('btnRequestAccess').addEventListener('click', () => modal.classList.remove('hidden'));
+      document.getElementById('btnCancelRequest').addEventListener('click', () => modal.classList.add('hidden'));
+      
+      document.getElementById('btnSendRequest').addEventListener('click', async () => {
+        const email = document.getElementById('reqEmail').value.trim();
+        const nombre = document.getElementById('reqName').value.trim();
+        if (!email || !nombre) return alert("Complete todos los campos.");
+        
+        const btn = document.getElementById('btnSendRequest');
+        btn.disabled = true; btn.innerHTML = 'Enviando...';
+
+        const success = await apiService.solicitarAcceso(email, nombre);
+        if (success) {
+          alert("✅ Solicitud enviada. El administrador revisará tu correo.");
+          modal.classList.add('hidden');
+        } else {
+          alert("❌ Error al enviar.");
+        }
+        btn.disabled = false; btn.innerHTML = 'Enviar';
+      });
+
+      // Modo Oscuro
+      const themeToggle = document.getElementById('themeToggle');
+      const themeIcon = document.getElementById('themeIcon');
+      if (localStorage.getItem('sw_theme') === 'light') {
+        document.body.classList.add('light-mode');
+        themeIcon.classList.replace('fa-moon', 'fa-sun');
+      }
+      themeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('light-mode');
+        const isLight = document.body.classList.contains('light-mode');
+        localStorage.setItem('sw_theme', isLight ? 'light' : 'dark');
+        themeIcon.classList.replace(isLight ? 'fa-moon' : 'fa-sun', isLight ? 'fa-sun' : 'fa-moon');
+      });
+    });
+  </script>
+</body>
+</html>
