@@ -142,7 +142,8 @@ async function saveLevante() {
     cantidad: cant, 
     costoUnitario: currentCosto, 
     total: cant * currentCosto,
-    stdCaseQty: currentProduct.stdCaseQty || 0
+    stdCaseQty: currentProduct.stdCaseQty || 0,
+    motivo: "Levante de inventario" // Motivo por defecto para ingresos
   };
   
   const success = await apiService.saveSobrante(data);
@@ -181,21 +182,41 @@ async function loadDashboard() {
     const data = await apiService.getSobrantes();
     const pendientes = data.filter(item => item.estado !== 'LEVANTADO');
 
+    // AGRUPAR LOS PRODUCTOS POR CÓDIGO
+    const agrupados = {};
     let totalSoles = 0;
     let totalBultos = 0;
     let totalSaldos = 0;
 
     pendientes.forEach(item => {
-      totalSoles += parseFloat(item.total) || 0;
-      
       const cant = parseFloat(item.cantidad) || 0;
-      const std = parseFloat(item.stdCaseQty) || 0;
-      let bultos = 0;
-      let saldos = cant;
+      const tot = parseFloat(item.total) || 0;
+      
+      if (!agrupados[item.codigo]) {
+        agrupados[item.codigo] = {
+          codigo: item.codigo,
+          descripcion: item.descripcion,
+          stdCaseQty: parseFloat(item.stdCaseQty) || 0,
+          cantidad: 0,
+          total: 0,
+          fechas: []
+        };
+      }
+      agrupados[item.codigo].cantidad += cant;
+      agrupados[item.codigo].total += tot;
+      agrupados[item.codigo].fechas.push(item.fecha);
+    });
 
-      if (std > 0) {
-        bultos = Math.trunc(cant / std);
-        saldos = cant % std;
+    const itemsMostrar = Object.values(agrupados).filter(item => item.cantidad > 0);
+
+    itemsMostrar.forEach(item => {
+      totalSoles += item.total;
+      let bultos = 0;
+      let saldos = item.cantidad;
+
+      if (item.stdCaseQty > 0) {
+        bultos = Math.trunc(item.cantidad / item.stdCaseQty);
+        saldos = item.cantidad % item.stdCaseQty;
       }
       
       totalBultos += bultos;
@@ -207,43 +228,36 @@ async function loadDashboard() {
     document.getElementById('kpiTotalSaldos').innerText = totalSaldos;
 
     dashList.innerHTML = '';
-    if (pendientes.length === 0) {
+    if (itemsMostrar.length === 0) {
       dashList.innerHTML = '<tr><td colspan="6" class="empty-msg">No hay productos pendientes.</td></tr>';
       return;
     }
 
-    pendientes.forEach(item => {
-      const totalNum = parseFloat(item.total) || 0;
-      const cant = parseFloat(item.cantidad) || 0;
-      const std = parseFloat(item.stdCaseQty) || 0;
-      
+    itemsMostrar.forEach(item => {
       let bultos = 0;
-      let saldos = cant;
+      let saldos = item.cantidad;
 
-      if (std > 0) {
-        bultos = Math.trunc(cant / std);
-        saldos = cant % std;
+      if (item.stdCaseQty > 0) {
+        bultos = Math.trunc(item.cantidad / item.stdCaseQty);
+        saldos = item.cantidad % item.stdCaseQty;
       }
 
-      const costoUnit = cant !== 0 ? (totalNum / cant) : 0;
-      const fechaStr = item.fecha.replace(/'/g, "\\'");
+      const costoUnit = item.cantidad !== 0 ? (item.total / item.cantidad) : 0;
+      const fechasCodificadas = encodeURIComponent(JSON.stringify(item.fechas));
       const descStr = item.descripcion.replace(/'/g, "\\'");
       
-      const colorBultos = bultos < 0 ? 'var(--danger)' : '#a855f7';
-      const colorSaldos = saldos < 0 ? 'var(--danger)' : 'var(--neon-green)';
-
       dashList.innerHTML += `
         <tr>
           <td style="color: var(--neon-cyan); font-weight: bold;">${item.codigo}</td>
           <td>${item.descripcion}</td>
-          <td style="text-align: center; font-weight: bold; color: ${colorBultos};">${bultos}</td>
-          <td style="text-align: center; font-weight: bold; color: ${colorSaldos};">${saldos}</td>
-          <td style="text-align: right; color: var(--neon-green); font-weight: bold;">S/ ${totalNum.toFixed(2)}</td>
+          <td style="text-align: center; font-weight: bold; color: #a855f7;">${bultos}</td>
+          <td style="text-align: center; font-weight: bold; color: var(--neon-green);">${saldos}</td>
+          <td style="text-align: right; color: var(--neon-green); font-weight: bold;">S/ ${item.total.toFixed(2)}</td>
           <td style="text-align: center; display: flex; justify-content: center; gap: 5px;">
-            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="descontarDesdeDashboard('${item.codigo}', '${descStr}', ${costoUnit}, ${std})" title="Descontar cantidad">
+            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="descontarDesdeDashboard('${item.codigo}', '${descStr}', ${costoUnit}, ${item.stdCaseQty})" title="Descontar cantidad">
               <i class="fa-solid fa-minus"></i>
             </button>
-            <button class="btn btn-success" style="padding: 4px 8px; font-size: 0.8rem;" onclick="completarLevante('${fechaStr}')" title="Marcar como Levantado">
+            <button class="btn btn-success" style="padding: 4px 8px; font-size: 0.8rem;" onclick="completarLevanteMultiple('${fechasCodificadas}')" title="Marcar como Levantado">
               <i class="fa-solid fa-check"></i>
             </button>
           </td>
@@ -255,15 +269,23 @@ async function loadDashboard() {
   }
 }
 
-async function completarLevante(fecha) {
+async function completarLevanteMultiple(fechasCodificadas) {
   if (!confirm("¿Marcar este producto como LEVANTADO? Desaparecerá del dashboard.")) return;
-  const success = await apiService.updateSobranteStatus(fecha, 'LEVANTADO');
-  if (success) {
-    alert("✅ Producto marcado como levantado.");
-    loadDashboard();
-  } else {
-    alert("❌ Error al actualizar el estado.");
+  
+  const fechas = JSON.parse(decodeURIComponent(fechasCodificadas));
+  let hasError = false;
+
+  for (const fecha of fechas) {
+    const success = await apiService.updateSobranteStatus(fecha, 'LEVANTADO');
+    if (!success) hasError = true;
   }
+
+  if (hasError) {
+    alert("⚠️ Hubo un problema al actualizar algunos registros. Recarga e intenta de nuevo.");
+  } else {
+    alert("✅ Producto marcado como levantado.");
+  }
+  loadDashboard();
 }
 
 async function completarTodo() {
@@ -338,6 +360,13 @@ async function loadHistory() {
         ? `<span style="background: var(--neon-green); color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">LEVANTADO</span>` 
         : `<span style="background: ${isDiscount ? 'var(--danger)' : 'var(--neon-cyan)'}; color: ${isDiscount ? '#fff' : '#000'}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">${isDiscount ? 'DESCUENTO' : 'PENDIENTE'}</span>`;
 
+      // Renderizar el motivo del descuento (si existe en la BD)
+      const motivoHtml = (item.motivo && isDiscount) 
+        ? `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 6px; font-style: italic; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px;">
+             <i class="fa-solid fa-comment-dots"></i> <strong>Motivo:</strong> ${item.motivo}
+           </div>` 
+        : '';
+
       list.innerHTML += `
         <div class="list-card" style="opacity: ${isLevantado ? '0.7' : '1'}; border-left: ${isDiscount ? '4px solid var(--danger)' : 'none'};">
           <div class="list-card-header">
@@ -348,7 +377,8 @@ async function loadHistory() {
             <span><i class="fa-solid fa-barcode"></i> ${item.codigo}</span>
             <span>Cant: <b style="color: ${isDiscount ? 'var(--danger)' : 'inherit'};">${cantNum}</b></span>
           </div>
-          <div class="list-card-footer">
+          ${motivoHtml}
+          <div class="list-card-footer" style="margin-top: 8px;">
             <span>${badgeEstado}</span>
             <span>${fechaStr}</span>
           </div>
@@ -433,6 +463,7 @@ async function toggleUser(email, nuevoEstado) {
 }
 
 async function descontarDesdeDashboard(codigo, descripcion, costoUnitario, stdCaseQty) {
+  // 1. Pedir la cantidad a descontar
   const input = prompt(`¿Cuántas unidades deseas descontar de:\n${descripcion}?`, "1");
   if (input === null) return; 
   
@@ -442,6 +473,31 @@ async function descontarDesdeDashboard(codigo, descripcion, costoUnitario, stdCa
     return alert("Por favor, ingresa una cantidad válida mayor a 0.");
   }
 
+  // 2. Pedir el MOTIVO usando opciones numéricas rápidas
+  const menuMotivos = `¿Por qué estás descontando este producto? (Ingresa el NÚMERO):\n
+1️⃣ Regularización de inventario
+2️⃣ Consumo / Uso interno
+3️⃣ Merma / Producto dañado
+4️⃣ Error de escaneo
+5️⃣ Otro motivo`;
+
+  const opcionElegida = prompt(menuMotivos, "1");
+  if (opcionElegida === null) return; // Si cancela, no hacemos nada
+
+  let motivoStr = "";
+  switch(opcionElegida.trim()) {
+    case "1": motivoStr = "Regularización de inventario"; break;
+    case "2": motivoStr = "Consumo / Uso interno"; break;
+    case "3": motivoStr = "Merma / Producto dañado"; break;
+    case "4": motivoStr = "Error de escaneo"; break;
+    case "5": 
+      motivoStr = prompt("Especifica el motivo en texto:", "Otro");
+      if (!motivoStr) return; 
+      break;
+    default:
+      motivoStr = "Regularización de inventario"; // Opción por defecto si pone una letra o número raro
+  }
+
   const data = {
     usuario: currentUser,
     codigo: codigo,
@@ -449,7 +505,8 @@ async function descontarDesdeDashboard(codigo, descripcion, costoUnitario, stdCa
     cantidad: -cantToDiscount, 
     costoUnitario: costoUnitario,
     total: -cantToDiscount * costoUnitario,
-    stdCaseQty: parseFloat(stdCaseQty) || 0
+    stdCaseQty: parseFloat(stdCaseQty) || 0,
+    motivo: motivoStr // Enviamos el motivo elegido
   };
 
   const success = await apiService.saveSobrante(data);
