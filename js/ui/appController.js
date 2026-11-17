@@ -15,22 +15,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Navegación
+  const navDashboard = document.getElementById('navDashboard');
   const navScanner = document.getElementById('navScanner');
   const navHistory = document.getElementById('navHistory');
   const navAdmin = document.getElementById('navAdmin');
   
+  const panelDashboard = document.getElementById('panelDashboard');
   const panelScanner = document.getElementById('panelScanner');
   const panelHistory = document.getElementById('panelHistory');
   const panelAdmin = document.getElementById('panelAdmin');
 
   function switchTab(activeNav, activePanel) {
-    [navScanner, navHistory, navAdmin].forEach(nav => nav.classList.remove('active'));
-    [panelScanner, panelHistory, panelAdmin].forEach(panel => panel.classList.add('hidden'));
+    [navDashboard, navScanner, navHistory, navAdmin].forEach(nav => { if(nav) nav.classList.remove('active'); });
+    [panelDashboard, panelScanner, panelHistory, panelAdmin].forEach(panel => { if(panel) panel.classList.add('hidden'); });
     
     activeNav.classList.add('active');
     activePanel.classList.remove('hidden');
   }
 
+  navDashboard.addEventListener('click', () => { switchTab(navDashboard, panelDashboard); loadDashboard(); });
   navScanner.addEventListener('click', () => switchTab(navScanner, panelScanner));
   navHistory.addEventListener('click', () => { switchTab(navHistory, panelHistory); loadHistory(); });
   if (navAdmin) {
@@ -42,6 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', saveLevante);
+  
+  // NUEVO: Evento para compartir reporte
+  document.getElementById('btnShareReport').addEventListener('click', shareReport);
 
   // BOTONES DE SUMA RÁPIDA
   document.getElementById('btnAddUnit').addEventListener('click', () => {
@@ -60,7 +67,110 @@ document.addEventListener('DOMContentLoaded', () => {
       calculateTotal();
     }
   });
+
+  loadDashboard();
 });
+
+// ================= LÓGICA DEL DASHBOARD =================
+async function loadDashboard() {
+  const dashList = document.getElementById('dashboardList');
+  dashList.innerHTML = '<p class="empty-msg">Cargando resumen...</p>';
+
+  try {
+    const data = await apiService.getSobrantes();
+    
+    let totalSoles = 0;
+    let totalUnidades = 0;
+    let totalLevantes = data.length;
+
+    data.forEach(item => {
+      totalSoles += parseFloat(item.total) || 0;
+      totalUnidades += parseFloat(item.cantidad) || 0;
+    });
+
+    document.getElementById('kpiTotalSoles').innerText = `S/ ${totalSoles.toFixed(2)}`;
+    document.getElementById('kpiTotalUnidades').innerText = totalUnidades;
+    document.getElementById('kpiTotalLevantes').innerText = totalLevantes;
+
+    dashList.innerHTML = '';
+    if (data.length === 0) {
+      dashList.innerHTML = '<p class="empty-msg">Aún no hay productos registrados.</p>';
+      return;
+    }
+
+    data.forEach(item => {
+      const totalNum = parseFloat(item.total) || 0;
+      const cantNum = parseFloat(item.cantidad) || 0;
+
+      dashList.innerHTML += `
+        <div class="list-card" style="border-left: 4px solid var(--neon-cyan);">
+          <div class="list-card-header">
+            <strong>${item.descripcion}</strong>
+            <span class="price">S/ ${totalNum.toFixed(2)}</span>
+          </div>
+          <div class="list-card-body">
+            <span><i class="fa-solid fa-barcode"></i> Cód: ${item.codigo}</span>
+            <span>Cant: <b>${cantNum}</b></span>
+          </div>
+        </div>
+      `;
+    });
+  } catch (error) {
+    dashList.innerHTML = '<p class="empty-msg" style="color:var(--danger)">Error al cargar el resumen.</p>';
+  }
+}
+
+// ================= COMPARTIR POR WHATSAPP =================
+async function shareReport() {
+  const btn = document.getElementById('btnShareReport');
+  const dashboard = document.getElementById('dashboardContent');
+  
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando imagen...';
+  btn.disabled = true;
+
+  try {
+    // Tomamos la "foto" del dashboard
+    const canvas = await html2canvas(dashboard, { 
+      scale: 2, // Mayor resolución
+      backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-main') // Respeta el modo oscuro/claro
+    });
+
+    // Convertimos el canvas a un archivo de imagen
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], 'Reporte_Donaciones.png', { type: 'image/png' });
+
+      // Verificamos si el celular soporta compartir archivos (Web Share API)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Reporte de Donaciones',
+            text: 'Aquí tienes el resumen de las donaciones registradas.'
+          });
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            console.error('Error al compartir:', error);
+          }
+        }
+      } else {
+        // Si no lo soporta (ej. en PC), se descarga la imagen automáticamente
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'Reporte_Donaciones.png';
+        link.click();
+        alert("✅ Imagen descargada. Si estás en PC, ábrela y envíala manualmente por WhatsApp.");
+      }
+    }, 'image/png');
+
+  } catch (error) {
+    console.error("Error al generar reporte:", error);
+    alert("❌ Error al generar la imagen.");
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
 
 // ================= LÓGICA DEL ESCÁNER =================
 async function startCamera() {
@@ -142,6 +252,7 @@ async function saveLevante() {
   if (success) {
     alert("✅ Levante guardado correctamente.");
     closeBottomSheet();
+    loadDashboard(); 
   } else {
     alert("❌ Error al guardar.");
     btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
@@ -149,11 +260,20 @@ async function saveLevante() {
 }
 
 function closeBottomSheet() {
-  currentProduct = null; currentCosto = 0;
+  currentProduct = null; 
+  currentCosto = 0;
+  
   document.getElementById('productSheet').classList.remove('show');
   document.getElementById('btnStartCamera').style.display = 'flex';
   document.getElementById('btnSave').disabled = false;
   document.getElementById('btnSave').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
+  
+  document.getElementById('prodDesc').innerText = 'Nombre del Producto';
+  document.getElementById('prodCode').innerText = '000000';
+  document.getElementById('prodCost').innerText = 'S/ 0.00';
+  document.getElementById('inputCantidad').value = '1';
+  document.getElementById('totalCost').innerText = '0.00';
+  
   if (html5QrCode) html5QrCode.resume();
 }
 

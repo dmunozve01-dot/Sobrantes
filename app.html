@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ScanInvent - App</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- NUEVA LIBRERÍA PARA TOMAR LA FOTO DE LA PANTALLA -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="./css/main.css">
 </head>
@@ -24,8 +27,43 @@
 
   <main class="app-content">
     
+    <!-- PANTALLA: DASHBOARD -->
+    <section id="panelDashboard" class="view active">
+      <h2 class="view-title">Resumen de Donaciones</h2>
+      
+      <!-- Envolvemos todo en un div para tomar la foto de aquí -->
+      <div id="dashboardContent" style="padding: 15px;">
+        <div class="kpi-grid">
+          <div class="kpi-card" style="border-left: 4px solid var(--neon-cyan);">
+            <span>Total Recaudado</span>
+            <h2 id="kpiTotalSoles">S/ 0.00</h2>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid var(--neon-green);">
+            <span>Total Unidades</span>
+            <h2 id="kpiTotalUnidades">0</h2>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid #a855f7;">
+            <span>Total Levantes</span>
+            <h2 id="kpiTotalLevantes">0</h2>
+          </div>
+        </div>
+
+        <h3 class="sub-title" style="padding-left: 0; margin-top: 10px;">Detalle de Productos</h3>
+        <div id="dashboardList" style="display: flex; flex-direction: column; gap: 10px;">
+          <p class="empty-msg">Cargando resumen...</p>
+        </div>
+      </div>
+
+      <!-- BOTÓN PARA COMPARTIR -->
+      <div style="padding: 0 15px 20px 15px;">
+        <button id="btnShareReport" class="btn btn-success" style="width: 100%; padding: 15px; font-size: 1.1rem;">
+          <i class="fa-brands fa-whatsapp" style="font-size: 1.3rem;"></i> Enviar Reporte a WhatsApp
+        </button>
+      </div>
+    </section>
+
     <!-- PANTALLA: ESCÁNER -->
-    <section id="panelScanner" class="view active">
+    <section id="panelScanner" class="view hidden">
       <div class="camera-container">
         <div id="reader"></div>
         <div class="scan-line" id="scanLine"></div>
@@ -74,7 +112,6 @@
         </div>
       </div>
 
-      <!-- BOTONES RÁPIDOS -->
       <div style="display: flex; gap: 10px; margin-bottom: 15px;">
         <button type="button" id="btnAddUnit" class="btn" style="flex: 1; background: var(--bg-hover); color: var(--text-main); font-size: 0.9rem; padding: 10px;">
           <i class="fa-solid fa-plus"></i> 1 Unidad
@@ -98,7 +135,11 @@
 
   <!-- BARRA DE NAVEGACIÓN INFERIOR -->
   <nav class="bottom-nav">
-    <button class="nav-item active" id="navScanner">
+    <button class="nav-item active" id="navDashboard">
+      <i class="fa-solid fa-chart-pie"></i>
+      <span>Inicio</span>
+    </button>
+    <button class="nav-item" id="navScanner">
       <i class="fa-solid fa-barcode"></i>
       <span>Escanear</span>
     </button>
