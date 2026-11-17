@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>ScanInvent - Escáner</title>
+  <title>ScanInvent - App</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="./css/main.css">
 </head>
 <body>
 
-  <!-- CABECERA (Usuario y Config) -->
   <header class="app-header">
     <div class="user-profile-mini">
       <img id="userAvatar" src="" alt="Avatar" referrerpolicy="no-referrer" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
@@ -23,14 +22,12 @@
     <button class="btn-icon btn-danger" id="btnLogout"><i class="fa-solid fa-right-from-bracket"></i></button>
   </header>
 
-  <!-- CONTENIDO PRINCIPAL -->
   <main class="app-content">
     
     <!-- PANTALLA: ESCÁNER -->
     <section id="panelScanner" class="view active">
       <div class="camera-container">
         <div id="reader"></div>
-        <!-- Línea animada de escaneo -->
         <div class="scan-line" id="scanLine"></div>
       </div>
       
@@ -48,20 +45,18 @@
       </div>
     </section>
 
-    <!-- PANTALLA: ADMIN (Oculta por defecto) -->
+    <!-- PANTALLA: ADMIN -->
     <section id="panelAdmin" class="view hidden">
       <h2 class="view-title">Gestión de Usuarios</h2>
-      
-      <h3 class="sub-title"><i class="fa-solid fa-user-clock"></i> Solicitudes</h3>
+      <h3 class="sub-title"><i class="fa-solid fa-user-clock"></i> Solicitudes Pendientes</h3>
       <div id="requestsList" class="list-container"></div>
-
       <h3 class="sub-title" style="margin-top: 20px;"><i class="fa-solid fa-users"></i> Autorizados</h3>
       <div id="usersList" class="list-container"></div>
     </section>
 
   </main>
 
-  <!-- BOTTOM SHEET (Panel deslizante del Producto) -->
+  <!-- BOTTOM SHEET (Panel de Producto) -->
   <div id="productSheet" class="bottom-sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-content">
@@ -71,17 +66,27 @@
       <div class="price-row">
         <div class="price-box">
           <span>Costo Unit.</span>
-          <strong id="prodCost">$0.00</strong>
+          <strong id="prodCost">S/ 0.00</strong>
         </div>
         <div class="price-box input-box">
-          <span>Cantidad</span>
+          <span>Cantidad Total</span>
           <input type="number" id="inputCantidad" min="1" value="1">
         </div>
       </div>
 
+      <!-- BOTONES RÁPIDOS -->
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <button type="button" id="btnAddUnit" class="btn" style="flex: 1; background: var(--bg-hover); color: var(--text-main); font-size: 0.9rem; padding: 10px;">
+          <i class="fa-solid fa-plus"></i> 1 Unidad
+        </button>
+        <button type="button" id="btnAddBox" class="btn" style="display: none; flex: 1; background: var(--neon-cyan); color: #000; font-size: 0.9rem; padding: 10px;">
+          <i class="fa-solid fa-box"></i> 1 Bulto (<span id="prodStdCase">0</span>)
+        </button>
+      </div>
+
       <div class="total-box">
         <span>Total a levantar:</span>
-        <h2>$<span id="totalCost">0.00</span></h2>
+        <h2>S/ <span id="totalCost">0.00</span></h2>
       </div>
 
       <div class="action-buttons">
@@ -113,7 +118,6 @@
   <script src="./js/ui/appController.js"></script>
   
   <script>
-    // Control del Tema Oscuro/Claro
     document.addEventListener('DOMContentLoaded', () => {
       const themeToggle = document.getElementById('themeToggle');
       const themeIcon = document.getElementById('themeIcon');

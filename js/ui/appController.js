@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- NAVEGACIÓN INFERIOR ---
   const navScanner = document.getElementById('navScanner');
   const navHistory = document.getElementById('navHistory');
   const navAdmin = document.getElementById('navAdmin');
@@ -38,25 +37,38 @@ document.addEventListener('DOMContentLoaded', () => {
     navAdmin.addEventListener('click', () => { switchTab(navAdmin, panelAdmin); loadAdminData(); });
   }
 
-  // --- CÁMARA ---
   html5QrCode = new Html5Qrcode("reader");
   document.getElementById('btnStartCamera').addEventListener('click', startCamera);
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', saveLevante);
+
+  // BOTONES DE SUMA RÁPIDA
+  document.getElementById('btnAddUnit').addEventListener('click', () => {
+    const input = document.getElementById('inputCantidad');
+    const cantActual = parseFloat(input.value) || 0;
+    input.value = cantActual + 1;
+    calculateTotal();
+  });
+
+  document.getElementById('btnAddBox').addEventListener('click', () => {
+    const stdCase = currentProduct ? (currentProduct.stdCaseQty || 0) : 0;
+    if (stdCase > 0) {
+      const input = document.getElementById('inputCantidad');
+      const cantActual = parseFloat(input.value) || 0;
+      input.value = cantActual + stdCase; 
+      calculateTotal();
+    }
+  });
 });
 
 // ================= LÓGICA DEL ESCÁNER =================
 async function startCamera() {
   document.getElementById('btnStartCamera').style.display = 'none';
-  document.getElementById('scanLine').style.display = 'block'; // Mostrar línea animada
+  document.getElementById('scanLine').style.display = 'block';
   
   try {
-    await html5QrCode.start(
-      { facingMode: "environment" }, 
-      { fps: 15 }, 
-      onScanSuccess
-    );
+    await html5QrCode.start({ facingMode: "environment" }, { fps: 15 }, onScanSuccess);
   } catch (err) {
     alert("Error al abrir la cámara. Recuerda que debes usar HTTPS.");
     document.getElementById('btnStartCamera').style.display = 'flex';
@@ -70,7 +82,6 @@ async function onScanSuccess(decodedText) {
   
   document.getElementById('scanLine').style.display = 'none';
 
-  // Abrir el panel inferior mientras busca
   document.getElementById('prodDesc').innerText = "Buscando producto...";
   document.getElementById('productSheet').classList.add('show');
   
@@ -80,10 +91,22 @@ async function onScanSuccess(decodedText) {
     currentProduct = res.producto;
     currentCosto = res.producto.costo;
     
-    document.getElementById('prodCode').innerText = decodedText;
-    document.getElementById('prodDesc').innerText = currentProduct.descripcion;
-    document.getElementById('prodCost').innerText = `$${currentCosto.toFixed(2)}`;
+    const nombreMostrar = currentProduct.descripcion ? currentProduct.descripcion : "Producto sin nombre";
     
+    document.getElementById('prodCode').innerText = decodedText;
+    document.getElementById('prodDesc').innerText = nombreMostrar;
+    document.getElementById('prodCost').innerText = `S/ ${currentCosto.toFixed(2)}`;
+    
+    const stdCase = currentProduct.stdCaseQty || 0;
+    const btnAddBox = document.getElementById('btnAddBox');
+    
+    if (stdCase > 0) {
+      document.getElementById('prodStdCase').innerText = stdCase;
+      btnAddBox.style.display = 'flex'; 
+    } else {
+      btnAddBox.style.display = 'none'; 
+    }
+
     document.getElementById('inputCantidad').value = 1;
     calculateTotal();
   } else {
@@ -108,7 +131,7 @@ async function saveLevante() {
   const data = { 
     usuario: currentUser, 
     codigo: currentProduct.codigoEncontrado, 
-    descripcion: currentProduct.descripcion, 
+    descripcion: currentProduct.descripcion || "Sin nombre", 
     cantidad: cant, 
     costoUnitario: currentCosto, 
     total: cant * currentCosto 
@@ -139,35 +162,42 @@ async function loadHistory() {
   const list = document.getElementById('historyList');
   list.innerHTML = '<p class="empty-msg">Cargando historial...</p>';
   
-  const data = await apiService.getSobrantes();
-  
-  list.innerHTML = '';
-  if (data.length === 0) {
-    list.innerHTML = '<p class="empty-msg">Aún no hay sobrantes registrados.</p>';
-    return;
+  try {
+    const data = await apiService.getSobrantes();
+    
+    list.innerHTML = '';
+    if (!data || data.length === 0) {
+      list.innerHTML = '<p class="empty-msg">Aún no hay sobrantes registrados.</p>';
+      return;
+    }
+
+    data.forEach(item => {
+      let fechaStr = item.fecha;
+      try { if(fechaStr && fechaStr !== "Sin fecha") fechaStr = new Date(fechaStr).toLocaleString('es-PE'); } catch(e) {}
+      
+      const totalNum = parseFloat(item.total) || 0;
+      const cantNum = parseFloat(item.cantidad) || 0;
+
+      list.innerHTML += `
+        <div class="list-card">
+          <div class="list-card-header">
+            <strong>${item.descripcion}</strong>
+            <span class="price">S/ ${totalNum.toFixed(2)}</span>
+          </div>
+          <div class="list-card-body">
+            <span><i class="fa-solid fa-barcode"></i> ${item.codigo}</span>
+            <span>Cant: <b>${cantNum}</b></span>
+          </div>
+          <div class="list-card-footer">
+            <span><i class="fa-solid fa-user"></i> ${item.usuario}</span>
+            <span>${fechaStr}</span>
+          </div>
+        </div>
+      `;
+    });
+  } catch (error) {
+    list.innerHTML = '<p class="empty-msg" style="color:var(--danger)">Error al cargar el historial.</p>';
   }
-
-  data.forEach(item => {
-    let fechaStr = item.fecha;
-    try { fechaStr = new Date(item.fecha).toLocaleString('es-PE'); } catch(e) {}
-
-    list.innerHTML += `
-      <div class="list-card">
-        <div class="list-card-header">
-          <strong>${item.descripcion}</strong>
-          <span class="price">$${parseFloat(item.total).toFixed(2)}</span>
-        </div>
-        <div class="list-card-body">
-          <span><i class="fa-solid fa-barcode"></i> ${item.codigo}</span>
-          <span>Cant: <b>${item.cantidad}</b></span>
-        </div>
-        <div class="list-card-footer">
-          <span><i class="fa-solid fa-user"></i> ${item.usuario}</span>
-          <span>${fechaStr}</span>
-        </div>
-      </div>
-    `;
-  });
 }
 
 // ================= LÓGICA DEL ADMIN =================

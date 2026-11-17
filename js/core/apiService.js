@@ -2,10 +2,9 @@ class APIService {
   async getBaseUrl() { return await APP_CONFIG.getApiUrl(); }
 
   async getUserRole(email) { 
-    const url = await this.getBaseUrl();
-    if (!url) return { error: "NO_AUTORIZADO" };
+    const url = await this.getBaseUrl(); if (!url) return { error: "NO_AUTORIZADO" };
     try {
-      const res = await fetch(`${url}?action=getUserRole&email=${encodeURIComponent(email)}`);
+      const res = await fetch(`${url}?action=getUserRole&email=${encodeURIComponent(email)}&t=${new Date().getTime()}`);
       return await res.json();
     } catch (err) { return { error: "NO_AUTORIZADO" }; }
   }
@@ -32,6 +31,15 @@ class APIService {
       await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "saveSobrante", data }) });
       return true;
     } catch (err) { return false; }
+  }
+
+  async getSobrantes() {
+    const url = await this.getBaseUrl(); if (!url) return [];
+    try {
+      const res = await fetch(`${url}?action=getSobrantes`);
+      const json = await res.json();
+      return json.success ? json.data : [];
+    } catch (err) { return []; }
   }
 
   async getRequests() {
