@@ -10,57 +10,69 @@ document.addEventListener('DOMContentLoaded', () => {
   if (userStr) {
     const u = JSON.parse(userStr);
     currentUser = u.name || "Operario";
-    
-    // Solo mostramos la pestaña Admin si el usuario es ADMIN
     if (u.role === 'ADMIN') {
-      document.getElementById('tabAdmin').classList.remove('hidden');
+      document.getElementById('navAdmin').classList.remove('hidden');
     }
   }
 
-  const tabScanner = document.getElementById('tabScanner');
-  const tabAdmin = document.getElementById('tabAdmin');
+  // --- NAVEGACIÓN INFERIOR ---
+  const navScanner = document.getElementById('navScanner');
+  const navHistory = document.getElementById('navHistory');
+  const navAdmin = document.getElementById('navAdmin');
+  
   const panelScanner = document.getElementById('panelScanner');
+  const panelHistory = document.getElementById('panelHistory');
   const panelAdmin = document.getElementById('panelAdmin');
 
-  tabScanner.addEventListener('click', () => {
-    tabScanner.className = 'btn btn-primary'; tabAdmin.className = 'btn btn-cancel hidden';
-    panelScanner.classList.remove('hidden'); panelAdmin.classList.add('hidden');
-  });
+  function switchTab(activeNav, activePanel) {
+    [navScanner, navHistory, navAdmin].forEach(nav => nav.classList.remove('active'));
+    [panelScanner, panelHistory, panelAdmin].forEach(panel => panel.classList.add('hidden'));
+    
+    activeNav.classList.add('active');
+    activePanel.classList.remove('hidden');
+  }
 
-  tabAdmin.addEventListener('click', () => {
-    tabAdmin.className = 'btn btn-primary'; tabScanner.className = 'btn btn-cancel';
-    panelAdmin.classList.remove('hidden'); panelScanner.classList.add('hidden');
-    loadAdminData();
-  });
+  navScanner.addEventListener('click', () => switchTab(navScanner, panelScanner));
+  navHistory.addEventListener('click', () => { switchTab(navHistory, panelHistory); loadHistory(); });
+  if (navAdmin) {
+    navAdmin.addEventListener('click', () => { switchTab(navAdmin, panelAdmin); loadAdminData(); });
+  }
 
+  // --- CÁMARA ---
   html5QrCode = new Html5Qrcode("reader");
   document.getElementById('btnStartCamera').addEventListener('click', startCamera);
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
-  document.getElementById('btnCancelScan').addEventListener('click', resetApp);
+  document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', saveLevante);
 });
 
+// ================= LÓGICA DEL ESCÁNER =================
 async function startCamera() {
   document.getElementById('btnStartCamera').style.display = 'none';
+  document.getElementById('scanLine').style.display = 'block'; // Mostrar línea animada
+  
   try {
-    // MEJORA: Sin "qrbox", escanea toda la pantalla. Ideal para códigos de barras de productos.
     await html5QrCode.start(
       { facingMode: "environment" }, 
       { fps: 15 }, 
       onScanSuccess
     );
   } catch (err) {
-    alert("Error al abrir la cámara. Recuerda que debes usar HTTPS (GitHub Pages).");
-    document.getElementById('btnStartCamera').style.display = 'block';
+    alert("Error al abrir la cámara. Recuerda que debes usar HTTPS.");
+    document.getElementById('btnStartCamera').style.display = 'flex';
+    document.getElementById('scanLine').style.display = 'none';
   }
 }
 
 async function onScanSuccess(decodedText) {
   html5QrCode.pause();
-  if (navigator.vibrate) navigator.vibrate(200); // Vibra el celular al escanear
+  if (navigator.vibrate) navigator.vibrate(200);
+  
+  document.getElementById('scanLine').style.display = 'none';
 
-  document.getElementById('productPanel').classList.remove('hidden');
-  document.getElementById('prodDesc').innerText = "Buscando en Google Sheets...";
+  // Abrir el panel inferior mientras busca
+  document.getElementById('prodDesc').innerText = "Buscando producto...";
+  document.getElementById('productSheet').classList.add('show');
   
   const res = await apiService.getProduct(decodedText);
 
@@ -70,14 +82,13 @@ async function onScanSuccess(decodedText) {
     
     document.getElementById('prodCode').innerText = decodedText;
     document.getElementById('prodDesc').innerText = currentProduct.descripcion;
-    document.getElementById('prodCost').value = `$${currentCosto.toFixed(2)}`;
+    document.getElementById('prodCost').innerText = `$${currentCosto.toFixed(2)}`;
     
-    // Ponemos la cantidad en 1 por defecto
     document.getElementById('inputCantidad').value = 1;
     calculateTotal();
   } else {
     alert("❌ Producto NO encontrado en la base de datos.");
-    resetApp();
+    closeBottomSheet();
   }
 }
 
@@ -106,53 +117,89 @@ async function saveLevante() {
   const success = await apiService.saveSobrante(data);
 
   if (success) {
-    alert("✅ Levante guardado correctamente en Sobrantes.");
-    resetApp();
+    alert("✅ Levante guardado correctamente.");
+    closeBottomSheet();
   } else {
-    alert("❌ Error al guardar. Revisa tu conexión.");
+    alert("❌ Error al guardar.");
     btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
   }
 }
 
-function resetApp() {
+function closeBottomSheet() {
   currentProduct = null; currentCosto = 0;
-  document.getElementById('productPanel').classList.add('hidden');
-  document.getElementById('btnStartCamera').style.display = 'block';
+  document.getElementById('productSheet').classList.remove('show');
+  document.getElementById('btnStartCamera').style.display = 'flex';
   document.getElementById('btnSave').disabled = false;
   document.getElementById('btnSave').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
-  if (html5QrCode) html5QrCode.resume(); // Vuelve a encender la cámara
+  if (html5QrCode) html5QrCode.resume();
+}
+
+// ================= LÓGICA DEL HISTORIAL =================
+async function loadHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<p class="empty-msg">Cargando historial...</p>';
+  
+  const data = await apiService.getSobrantes();
+  
+  list.innerHTML = '';
+  if (data.length === 0) {
+    list.innerHTML = '<p class="empty-msg">Aún no hay sobrantes registrados.</p>';
+    return;
+  }
+
+  data.forEach(item => {
+    let fechaStr = item.fecha;
+    try { fechaStr = new Date(item.fecha).toLocaleString('es-PE'); } catch(e) {}
+
+    list.innerHTML += `
+      <div class="list-card">
+        <div class="list-card-header">
+          <strong>${item.descripcion}</strong>
+          <span class="price">$${parseFloat(item.total).toFixed(2)}</span>
+        </div>
+        <div class="list-card-body">
+          <span><i class="fa-solid fa-barcode"></i> ${item.codigo}</span>
+          <span>Cant: <b>${item.cantidad}</b></span>
+        </div>
+        <div class="list-card-footer">
+          <span><i class="fa-solid fa-user"></i> ${item.usuario}</span>
+          <span>${fechaStr}</span>
+        </div>
+      </div>
+    `;
+  });
 }
 
 // ================= LÓGICA DEL ADMIN =================
 async function loadAdminData() {
   const reqList = document.getElementById('requestsList');
-  reqList.innerHTML = '<p style="color: var(--text-gray);">Cargando...</p>';
+  reqList.innerHTML = '<p class="empty-msg">Cargando...</p>';
   const requests = await apiService.getRequests();
   
   reqList.innerHTML = '';
   if (requests.length === 0) {
-    reqList.innerHTML = '<p style="color: var(--text-gray);">No hay solicitudes pendientes.</p>';
+    reqList.innerHTML = '<p class="empty-msg">No hay solicitudes pendientes.</p>';
   } else {
     requests.forEach(req => {
       reqList.innerHTML += `
-        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-main); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <div class="list-card" style="display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <strong style="display: block; font-size: 0.9rem;">${req.nombre}</strong>
-            <span style="font-size: 0.8rem; color: var(--text-gray);">${req.email}</span>
+            <strong style="display:block; font-size:0.9rem;">${req.nombre}</strong>
+            <span style="font-size:0.8rem; color:var(--text-gray);">${req.email}</span>
           </div>
-          <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="approveUser('${req.email}', '${req.nombre}')">Aprobar</button>
+          <button class="btn btn-success" style="padding:8px 12px; font-size:0.8rem;" onclick="approveUser('${req.email}', '${req.nombre}')">Aprobar</button>
         </div>
       `;
     });
   }
 
   const userList = document.getElementById('usersList');
-  userList.innerHTML = '<p style="color: var(--text-gray);">Cargando...</p>';
+  userList.innerHTML = '<p class="empty-msg">Cargando...</p>';
   const users = await apiService.getUsers();
   
   userList.innerHTML = '';
   if (users.length === 0) {
-    userList.innerHTML = '<p style="color: var(--text-gray);">No hay usuarios registrados.</p>';
+    userList.innerHTML = '<p class="empty-msg">No hay usuarios registrados.</p>';
   } else {
     users.forEach(u => {
       const isBlocked = u.estado === 'BLOQUEADO';
@@ -160,16 +207,13 @@ async function loadAdminData() {
       const btnText = isBlocked ? 'Desbloquear' : 'Bloquear';
       
       userList.innerHTML += `
-        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-main); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 5px;">
+        <div class="list-card" style="display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <strong style="display: block; font-size: 0.9rem;">${u.nombre}</strong>
-            <span style="font-size: 0.8rem; color: var(--text-gray);">${u.email}</span>
-            <span style="font-size: 0.7rem; background: var(--bg-hover); padding: 2px 6px; border-radius: 4px; margin-left: 5px;">${u.rol}</span>
+            <strong style="display:block; font-size:0.9rem;">${u.nombre} <span style="font-size:0.65rem; background:var(--bg-hover); padding:2px 4px; border-radius:4px;">${u.rol}</span></strong>
+            <span style="font-size:0.8rem; color:var(--text-gray);">${u.email}</span>
+            <span style="color: ${badgeColor}; font-weight: bold; font-size: 0.75rem;">● ${u.estado}</span>
           </div>
-          <div>
-            <span style="color: ${badgeColor}; font-weight: bold; font-size: 0.8rem; margin-right: 10px;">${u.estado}</span>
-            <button class="btn btn-cancel" style="padding: 6px 12px; font-size: 0.8rem;" onclick="toggleUser('${u.email}', '${isBlocked ? 'ACTIVO' : 'BLOQUEADO'}')">${btnText}</button>
-          </div>
+          <button class="btn btn-cancel" style="padding:8px 12px; font-size:0.8rem;" onclick="toggleUser('${u.email}', '${isBlocked ? 'ACTIVO' : 'BLOQUEADO'}')">${btnText}</button>
         </div>
       `;
     });
