@@ -89,6 +89,22 @@ body:not(.login-body) { height: 100vh; display: flex; flex-direction: column; ov
 .total-box h2 { color: var(--neon-green); font-size: 2rem; margin: 0; }
 .action-buttons { display: flex; gap: 10px; }
 
+/* DASHBOARD (KPI Y TABLA EXCEL) */
+.kpi-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 20px; }
+.kpi-card { background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 5px; }
+.kpi-card span { font-size: 0.8rem; color: var(--text-gray); font-weight: bold; text-transform: uppercase; }
+.kpi-card h2 { font-size: 1.8rem; margin: 0; color: var(--text-main); }
+
+.table-responsive { width: 100%; overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); }
+.excel-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+.excel-table th, .excel-table td { padding: 10px 8px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
+.excel-table th:last-child, .excel-table td:last-child { border-right: none; }
+.excel-table thead { background: var(--bg-hover); color: var(--text-gray); font-weight: bold; text-transform: uppercase; font-size: 0.75rem; }
+.excel-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
+body.light-mode .excel-table tbody tr:nth-child(even) { background: rgba(0, 0, 0, 0.03); }
+.excel-table td { color: var(--text-main); vertical-align: middle; }
+.excel-table td.empty-msg { text-align: center; padding: 30px; color: var(--text-gray); }
+
 /* LISTAS (Historial/Admin) */
 .view-title { padding: 20px; font-size: 1.3rem; border-bottom: 1px solid var(--border-color); }
 .sub-title { padding: 15px 20px 5px; font-size: 1rem; color: var(--neon-cyan); }
@@ -103,7 +119,7 @@ body:not(.login-body) { height: 100vh; display: flex; flex-direction: column; ov
 
 /* NAVEGACIÓN INFERIOR */
 .bottom-nav { position: absolute; bottom: 0; left: 0; right: 0; height: 65px; background: var(--bg-header); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border-color); z-index: 100; padding-bottom: env(safe-area-inset-bottom); }
-.nav-item { background: transparent; border: none; color: var(--text-gray); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; width: 33%; transition: 0.2s; }
+.nav-item { background: transparent; border: none; color: var(--text-gray); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; flex: 1; transition: 0.2s; }
 .nav-item i { font-size: 1.3rem; }
 .nav-item span { font-size: 0.7rem; font-weight: bold; }
 .nav-item.active { color: var(--neon-cyan); }

@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', saveLevante);
   
-  // NUEVO: Evento para compartir reporte
+  // Evento para compartir reporte
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
 
   // BOTONES DE SUMA RÁPIDA
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ================= LÓGICA DEL DASHBOARD =================
 async function loadDashboard() {
   const dashList = document.getElementById('dashboardList');
-  dashList.innerHTML = '<p class="empty-msg">Cargando resumen...</p>';
+  dashList.innerHTML = '<tr><td colspan="4" class="empty-msg">Cargando resumen...</td></tr>';
 
   try {
     const data = await apiService.getSobrantes();
@@ -94,7 +94,7 @@ async function loadDashboard() {
 
     dashList.innerHTML = '';
     if (data.length === 0) {
-      dashList.innerHTML = '<p class="empty-msg">Aún no hay productos registrados.</p>';
+      dashList.innerHTML = '<tr><td colspan="4" class="empty-msg">Aún no hay productos registrados.</td></tr>';
       return;
     }
 
@@ -103,20 +103,16 @@ async function loadDashboard() {
       const cantNum = parseFloat(item.cantidad) || 0;
 
       dashList.innerHTML += `
-        <div class="list-card" style="border-left: 4px solid var(--neon-cyan);">
-          <div class="list-card-header">
-            <strong>${item.descripcion}</strong>
-            <span class="price">S/ ${totalNum.toFixed(2)}</span>
-          </div>
-          <div class="list-card-body">
-            <span><i class="fa-solid fa-barcode"></i> Cód: ${item.codigo}</span>
-            <span>Cant: <b>${cantNum}</b></span>
-          </div>
-        </div>
+        <tr>
+          <td style="color: var(--neon-cyan); font-weight: bold;">${item.codigo}</td>
+          <td>${item.descripcion}</td>
+          <td style="text-align: center; font-weight: bold;">${cantNum}</td>
+          <td style="text-align: right; color: var(--neon-green); font-weight: bold;">S/ ${totalNum.toFixed(2)}</td>
+        </tr>
       `;
     });
   } catch (error) {
-    dashList.innerHTML = '<p class="empty-msg" style="color:var(--danger)">Error al cargar el resumen.</p>';
+    dashList.innerHTML = '<tr><td colspan="4" class="empty-msg" style="color:var(--danger)">Error al cargar el resumen.</td></tr>';
   }
 }
 
@@ -130,17 +126,14 @@ async function shareReport() {
   btn.disabled = true;
 
   try {
-    // Tomamos la "foto" del dashboard
     const canvas = await html2canvas(dashboard, { 
-      scale: 2, // Mayor resolución
-      backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-main') // Respeta el modo oscuro/claro
+      scale: 2,
+      backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-main')
     });
 
-    // Convertimos el canvas a un archivo de imagen
     canvas.toBlob(async (blob) => {
       const file = new File([blob], 'Reporte_Donaciones.png', { type: 'image/png' });
 
-      // Verificamos si el celular soporta compartir archivos (Web Share API)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({
@@ -149,12 +142,9 @@ async function shareReport() {
             text: 'Aquí tienes el resumen de las donaciones registradas.'
           });
         } catch (error) {
-          if (error.name !== 'AbortError') {
-            console.error('Error al compartir:', error);
-          }
+          if (error.name !== 'AbortError') console.error('Error al compartir:', error);
         }
       } else {
-        // Si no lo soporta (ej. en PC), se descarga la imagen automáticamente
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = 'Reporte_Donaciones.png';

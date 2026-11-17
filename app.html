@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ScanInvent - App</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- NUEVA LIBRERÍA PARA TOMAR LA FOTO DE LA PANTALLA -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="./css/main.css">
 </head>
@@ -27,12 +25,12 @@
 
   <main class="app-content">
     
-    <!-- PANTALLA: DASHBOARD -->
+    <!-- PANTALLA: DASHBOARD (RESUMEN TIPO EXCEL) -->
     <section id="panelDashboard" class="view active">
-      <h2 class="view-title">Resumen de Donaciones</h2>
+      <h2 class="view-title">Resumen de Levante</h2>
       
-      <!-- Envolvemos todo en un div para tomar la foto de aquí -->
       <div id="dashboardContent" style="padding: 15px;">
+        <!-- Tarjetas de Totales -->
         <div class="kpi-grid">
           <div class="kpi-card" style="border-left: 4px solid var(--neon-cyan);">
             <span>Total Recaudado</span>
@@ -48,9 +46,25 @@
           </div>
         </div>
 
-        <h3 class="sub-title" style="padding-left: 0; margin-top: 10px;">Detalle de Productos</h3>
-        <div id="dashboardList" style="display: flex; flex-direction: column; gap: 10px;">
-          <p class="empty-msg">Cargando resumen...</p>
+        <h3 class="sub-title" style="padding-left: 0; margin-top: 15px; margin-bottom: 10px;">Detalle de Productos</h3>
+        
+        <!-- DISEÑO TIPO EXCEL -->
+        <div class="table-responsive">
+          <table class="excel-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th style="text-align: center;">Cant.</th>
+                <th style="text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardList">
+              <tr>
+                <td colspan="4" class="empty-msg">Cargando resumen...</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
