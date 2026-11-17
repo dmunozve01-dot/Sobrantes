@@ -15,7 +15,7 @@
 
   <div class="login-card">
     <div class="brand-logo">
-      <i class="fa-solid fa-barcode" style="font-size: 3rem; color: var(--neon-cyan);"></i>
+      <i class="fa-solid fa-barcode"></i>
     </div>
     
     <h2>ScanInvent</h2>
@@ -32,9 +32,9 @@
 
     <div class="divider"><span>o</span></div>
 
-    <div style="margin-top: 15px;">
-      <p style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 10px;">¿No tienes acceso?</p>
-      <button class="btn btn-cancel" type="button" id="btnRequestAccess" style="width: 100%; font-size: 0.9rem;">
+    <div class="request-access-box">
+      <p>¿No tienes acceso al sistema?</p>
+      <button class="btn btn-cancel" type="button" id="btnRequestAccess">
         <i class="fa-solid fa-envelope"></i> Solicitar Acceso
       </button>
     </div>
@@ -93,12 +93,15 @@
         const btn = document.getElementById('btnSendRequest');
         btn.disabled = true; btn.innerHTML = 'Enviando...';
 
-        const success = await apiService.solicitarAcceso(email, nombre);
-        if (success) {
-          alert("✅ Solicitud enviada. El administrador revisará tu correo.");
+        const res = await apiService.solicitarAcceso(email, nombre);
+        
+        if (res.success) {
+          alert("✅ " + res.message);
           modal.classList.add('hidden');
+          document.getElementById('reqEmail').value = '';
+          document.getElementById('reqName').value = '';
         } else {
-          alert("❌ Error al enviar.");
+          alert("❌ " + res.message);
         }
         btn.disabled = false; btn.innerHTML = 'Enviar';
       });

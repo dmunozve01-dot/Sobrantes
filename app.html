@@ -34,13 +34,13 @@
             <span>Total Recaudado</span>
             <h2 id="kpiTotalSoles">S/ 0.00</h2>
           </div>
-          <div class="kpi-card" style="border-left: 4px solid var(--neon-green);">
-            <span>Total Unidades</span>
-            <h2 id="kpiTotalUnidades">0</h2>
-          </div>
           <div class="kpi-card" style="border-left: 4px solid #a855f7;">
-            <span>Total Levantes</span>
-            <h2 id="kpiTotalLevantes">0</h2>
+            <span>Total Bultos (Cajas)</span>
+            <h2 id="kpiTotalBultos">0</h2>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid var(--neon-green);">
+            <span>Total Saldos (Unidades)</span>
+            <h2 id="kpiTotalSaldos">0</h2>
           </div>
         </div>
 
@@ -52,18 +52,18 @@
               <tr>
                 <th>Código</th>
                 <th>Descripción</th>
-                <th style="text-align: center;">Cant.</th>
+                <th style="text-align: center; color: #a855f7;">Bultos</th>
+                <th style="text-align: center; color: var(--neon-green);">Saldos</th>
                 <th style="text-align: right;">Total</th>
                 <th style="text-align: center;">Acción</th>
               </tr>
             </thead>
             <tbody id="dashboardList">
-              <tr><td colspan="5" class="empty-msg">Cargando resumen...</td></tr>
+              <tr><td colspan="6" class="empty-msg">Cargando resumen...</td></tr>
             </tbody>
           </table>
         </div>
 
-        <!-- BOTONES DE ACCIÓN (LEVANTAR TODO Y WHATSAPP) -->
         <div style="display: flex; gap: 10px; margin-top: 15px;">
           <button id="btnCompleteAll" class="btn btn-primary" style="flex: 1; padding: 15px; font-size: 1rem;">
             <i class="fa-solid fa-check-double"></i> Levantar Todo
@@ -88,7 +88,7 @@
     </section>
 
     <section id="panelHistory" class="view hidden">
-      <h2 class="view-title">Historial de Levantes</h2>
+      <h2 class="view-title">Historial de Movimientos</h2>
       <div id="historyList" class="list-container">
         <p class="empty-msg">Cargando...</p>
       </div>
@@ -135,9 +135,14 @@
         <h2>S/ <span id="totalCost">0.00</span></h2>
       </div>
 
-      <div class="action-buttons">
-        <button class="btn btn-cancel" id="btnCancelScan">Cancelar</button>
-        <button class="btn btn-success" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+      <div class="action-buttons" style="display: flex; gap: 5px;">
+        <button class="btn btn-cancel" id="btnCancelScan" style="flex: 1; padding: 12px 5px; font-size: 0.8rem;">Cancelar</button>
+        <button class="btn" id="btnDiscount" style="flex: 1; padding: 12px 5px; font-size: 0.8rem; background: var(--danger); color: white;">
+          <i class="fa-solid fa-minus"></i> Descontar
+        </button>
+        <button class="btn btn-success" id="btnSave" style="flex: 1; padding: 12px 5px; font-size: 0.8rem;">
+          <i class="fa-solid fa-plus"></i> Agregar
+        </button>
       </div>
     </div>
   </div>

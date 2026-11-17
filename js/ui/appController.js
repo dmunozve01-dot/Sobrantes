@@ -43,7 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnCameraToggle').addEventListener('click', toggleCamera);
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
-  document.getElementById('btnSave').addEventListener('click', saveLevante);
+  
+  document.getElementById('btnSave').addEventListener('click', () => saveLevante(false));
+  document.getElementById('btnDiscount').addEventListener('click', () => saveLevante(true));
+  
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
   document.getElementById('btnCompleteAll').addEventListener('click', completarTodo);
 
@@ -123,24 +126,38 @@ function calculateTotal() {
   document.getElementById('totalCost').innerText = (cant * currentCosto).toFixed(2);
 }
 
-async function saveLevante() {
+async function saveLevante(isDiscount = false) {
   if (!currentProduct) return;
-  const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
+  let cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
   if (cant <= 0) return alert("Ingresa una cantidad válida.");
 
-  const btn = document.getElementById('btnSave');
-  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+  if (isDiscount) cant = cant * -1;
 
-  const data = { usuario: currentUser, codigo: currentProduct.codigoEncontrado, descripcion: currentProduct.descripcion || "Sin nombre", cantidad: cant, costoUnitario: currentCosto, total: cant * currentCosto };
+  const btn = isDiscount ? document.getElementById('btnDiscount') : document.getElementById('btnSave');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true; 
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+  const data = { 
+    usuario: currentUser, 
+    codigo: currentProduct.codigoEncontrado, 
+    descripcion: currentProduct.descripcion || "Sin nombre", 
+    cantidad: cant, 
+    costoUnitario: currentCosto, 
+    total: cant * currentCosto,
+    stdCaseQty: currentProduct.stdCaseQty || 0
+  };
+  
   const success = await apiService.saveSobrante(data);
 
   if (success) {
-    alert("✅ Levante guardado.");
+    alert(isDiscount ? "✅ Descuento registrado." : "✅ Levante guardado.");
     closeBottomSheet();
     loadDashboard(); 
   } else {
     alert("❌ Error al guardar.");
-    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
+    btn.disabled = false; 
+    btn.innerHTML = originalHTML;
   }
 }
 
@@ -148,7 +165,10 @@ function closeBottomSheet() {
   currentProduct = null; currentCosto = 0;
   document.getElementById('productSheet').classList.remove('show');
   document.getElementById('btnSave').disabled = false;
-  document.getElementById('btnSave').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
+  document.getElementById('btnDiscount').disabled = false;
+  document.getElementById('btnSave').innerHTML = '<i class="fa-solid fa-plus"></i> Agregar';
+  document.getElementById('btnDiscount').innerHTML = '<i class="fa-solid fa-minus"></i> Descontar';
+  
   document.getElementById('prodDesc').innerText = 'Nombre del Producto';
   document.getElementById('prodCode').innerText = '000000';
   document.getElementById('prodCost').innerText = 'S/ 0.00';
@@ -160,41 +180,67 @@ function closeBottomSheet() {
 // ================= DASHBOARD =================
 async function loadDashboard() {
   const dashList = document.getElementById('dashboardList');
-  dashList.innerHTML = '<tr><td colspan="5" class="empty-msg">Cargando resumen...</td></tr>';
+  dashList.innerHTML = '<tr><td colspan="6" class="empty-msg">Cargando resumen...</td></tr>';
 
   try {
     const data = await apiService.getSobrantes();
     const pendientes = data.filter(item => item.estado !== 'LEVANTADO');
 
     let totalSoles = 0;
-    let totalUnidades = 0;
-    let totalLevantes = pendientes.length;
+    let totalBultos = 0;
+    let totalSaldos = 0;
 
     pendientes.forEach(item => {
       totalSoles += parseFloat(item.total) || 0;
-      totalUnidades += parseFloat(item.cantidad) || 0;
+      
+      const cant = parseFloat(item.cantidad) || 0;
+      const std = parseFloat(item.stdCaseQty) || 0;
+      let bultos = 0;
+      let saldos = cant;
+
+      if (std > 0) {
+        bultos = Math.trunc(cant / std);
+        saldos = cant % std;
+      }
+      
+      totalBultos += bultos;
+      totalSaldos += saldos;
     });
 
     document.getElementById('kpiTotalSoles').innerText = `S/ ${totalSoles.toFixed(2)}`;
-    document.getElementById('kpiTotalUnidades').innerText = totalUnidades;
-    document.getElementById('kpiTotalLevantes').innerText = totalLevantes;
+    document.getElementById('kpiTotalBultos').innerText = totalBultos;
+    document.getElementById('kpiTotalSaldos').innerText = totalSaldos;
 
     dashList.innerHTML = '';
     if (pendientes.length === 0) {
-      dashList.innerHTML = '<tr><td colspan="5" class="empty-msg">No hay productos pendientes por levantar.</td></tr>';
+      dashList.innerHTML = '<tr><td colspan="6" class="empty-msg">No hay productos pendientes.</td></tr>';
       return;
     }
 
     pendientes.forEach(item => {
       const totalNum = parseFloat(item.total) || 0;
-      const cantNum = parseFloat(item.cantidad) || 0;
+      const cant = parseFloat(item.cantidad) || 0;
+      const std = parseFloat(item.stdCaseQty) || 0;
+      
+      let bultos = 0;
+      let saldos = cant;
+
+      if (std > 0) {
+        bultos = Math.trunc(cant / std);
+        saldos = cant % std;
+      }
+
       const fechaStr = item.fecha.replace(/'/g, "\\'");
+      
+      const colorBultos = bultos < 0 ? 'var(--danger)' : '#a855f7';
+      const colorSaldos = saldos < 0 ? 'var(--danger)' : 'var(--neon-green)';
 
       dashList.innerHTML += `
         <tr>
           <td style="color: var(--neon-cyan); font-weight: bold;">${item.codigo}</td>
           <td>${item.descripcion}</td>
-          <td style="text-align: center; font-weight: bold;">${cantNum}</td>
+          <td style="text-align: center; font-weight: bold; color: ${colorBultos};">${bultos}</td>
+          <td style="text-align: center; font-weight: bold; color: ${colorSaldos};">${saldos}</td>
           <td style="text-align: right; color: var(--neon-green); font-weight: bold;">S/ ${totalNum.toFixed(2)}</td>
           <td style="text-align: center;">
             <button class="btn btn-success" style="padding: 4px 8px; font-size: 0.8rem;" onclick="completarLevante('${fechaStr}')" title="Marcar como Levantado">
@@ -205,7 +251,7 @@ async function loadDashboard() {
       `;
     });
   } catch (error) {
-    dashList.innerHTML = '<tr><td colspan="5" class="empty-msg" style="color:var(--danger)">Error al cargar el resumen.</td></tr>';
+    dashList.innerHTML = '<tr><td colspan="6" class="empty-msg" style="color:var(--danger)">Error al cargar el resumen.</td></tr>';
   }
 }
 
@@ -221,7 +267,7 @@ async function completarLevante(fecha) {
 }
 
 async function completarTodo() {
-  if (!confirm("⚠️ ¿Estás seguro de marcar TODOS los productos pendientes como LEVANTADOS?\n\nDesaparecerán del Dashboard pero se guardarán en el Historial.")) return;
+  if (!confirm("⚠️ ¿Estás seguro de marcar TODOS los productos pendientes como LEVANTADOS?")) return;
 
   const btn = document.getElementById('btnCompleteAll');
   const originalText = btn.innerHTML;
@@ -286,19 +332,21 @@ async function loadHistory() {
       const totalNum = parseFloat(item.total) || 0;
       const cantNum = parseFloat(item.cantidad) || 0;
       const isLevantado = item.estado === 'LEVANTADO';
+      const isDiscount = cantNum < 0;
+      
       const badgeEstado = isLevantado 
         ? `<span style="background: var(--neon-green); color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">LEVANTADO</span>` 
-        : `<span style="background: var(--danger); color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">PENDIENTE</span>`;
+        : `<span style="background: ${isDiscount ? 'var(--danger)' : 'var(--neon-cyan)'}; color: ${isDiscount ? '#fff' : '#000'}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">${isDiscount ? 'DESCUENTO' : 'PENDIENTE'}</span>`;
 
       list.innerHTML += `
-        <div class="list-card" style="opacity: ${isLevantado ? '0.7' : '1'};">
+        <div class="list-card" style="opacity: ${isLevantado ? '0.7' : '1'}; border-left: ${isDiscount ? '4px solid var(--danger)' : 'none'};">
           <div class="list-card-header">
             <strong>${item.descripcion}</strong>
-            <span class="price">S/ ${totalNum.toFixed(2)}</span>
+            <span class="price" style="color: ${isDiscount ? 'var(--danger)' : 'var(--neon-green)'};">S/ ${totalNum.toFixed(2)}</span>
           </div>
           <div class="list-card-body">
             <span><i class="fa-solid fa-barcode"></i> ${item.codigo}</span>
-            <span>Cant: <b>${cantNum}</b></span>
+            <span>Cant: <b style="color: ${isDiscount ? 'var(--danger)' : 'inherit'};">${cantNum}</b></span>
           </div>
           <div class="list-card-footer">
             <span>${badgeEstado}</span>
@@ -323,7 +371,6 @@ async function loadAdminData() {
     reqList.innerHTML = '<p class="empty-msg">No hay solicitudes pendientes.</p>';
   } else {
     requests.forEach(req => {
-      // AQUÍ ESTÁ EL CAMBIO: DOS BOTONES CLAROS EN VEZ DE CONFIRM
       reqList.innerHTML += `
         <div class="list-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
           <div style="flex: 1; min-width: 150px;">
@@ -370,7 +417,6 @@ async function loadAdminData() {
   }
 }
 
-// FUNCIÓN ACTUALIZADA: AHORA RECIBE EL ROL DIRECTAMENTE
 async function approveUser(email, nombre, rol) {
   const success = await apiService.approveUser({ email, nombre, rol: rol });
   if (success) {

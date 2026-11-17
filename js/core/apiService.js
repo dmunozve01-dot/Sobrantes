@@ -10,11 +10,11 @@ class APIService {
   }
 
   async solicitarAcceso(email, nombre) {
-    const url = await this.getBaseUrl(); if (!url) return false;
+    const url = await this.getBaseUrl(); if (!url) return { success: false, message: "Falta URL" };
     try {
-      await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "solicitarAcceso", email, nombre }) });
-      return true; 
-    } catch (err) { return false; }
+      const res = await fetch(`${url}?action=solicitarAcceso&email=${encodeURIComponent(email)}&nombre=${encodeURIComponent(nombre)}&t=${new Date().getTime()}`);
+      return await res.json();
+    } catch (err) { return { success: false, message: "Error de conexión." }; }
   }
 
   async getProduct(code) {
