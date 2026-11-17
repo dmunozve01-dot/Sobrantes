@@ -44,8 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   
-  document.getElementById('btnSave').addEventListener('click', () => saveLevante(false));
-  document.getElementById('btnDiscount').addEventListener('click', () => saveLevante(true));
+  document.getElementById('btnSave').addEventListener('click', () => saveLevante());
   
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
   document.getElementById('btnCompleteAll').addEventListener('click', completarTodo);
@@ -126,14 +125,12 @@ function calculateTotal() {
   document.getElementById('totalCost').innerText = (cant * currentCosto).toFixed(2);
 }
 
-async function saveLevante(isDiscount = false) {
+async function saveLevante() {
   if (!currentProduct) return;
   let cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
   if (cant <= 0) return alert("Ingresa una cantidad válida.");
 
-  if (isDiscount) cant = cant * -1;
-
-  const btn = isDiscount ? document.getElementById('btnDiscount') : document.getElementById('btnSave');
+  const btn = document.getElementById('btnSave');
   const originalHTML = btn.innerHTML;
   btn.disabled = true; 
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
@@ -151,7 +148,7 @@ async function saveLevante(isDiscount = false) {
   const success = await apiService.saveSobrante(data);
 
   if (success) {
-    alert(isDiscount ? "✅ Descuento registrado." : "✅ Levante guardado.");
+    alert("✅ Levante guardado.");
     closeBottomSheet();
     loadDashboard(); 
   } else {
@@ -165,9 +162,7 @@ function closeBottomSheet() {
   currentProduct = null; currentCosto = 0;
   document.getElementById('productSheet').classList.remove('show');
   document.getElementById('btnSave').disabled = false;
-  document.getElementById('btnDiscount').disabled = false;
   document.getElementById('btnSave').innerHTML = '<i class="fa-solid fa-plus"></i> Agregar';
-  document.getElementById('btnDiscount').innerHTML = '<i class="fa-solid fa-minus"></i> Descontar';
   
   document.getElementById('prodDesc').innerText = 'Nombre del Producto';
   document.getElementById('prodCode').innerText = '000000';
@@ -230,7 +225,9 @@ async function loadDashboard() {
         saldos = cant % std;
       }
 
+      const costoUnit = cant !== 0 ? (totalNum / cant) : 0;
       const fechaStr = item.fecha.replace(/'/g, "\\'");
+      const descStr = item.descripcion.replace(/'/g, "\\'");
       
       const colorBultos = bultos < 0 ? 'var(--danger)' : '#a855f7';
       const colorSaldos = saldos < 0 ? 'var(--danger)' : 'var(--neon-green)';
@@ -242,7 +239,10 @@ async function loadDashboard() {
           <td style="text-align: center; font-weight: bold; color: ${colorBultos};">${bultos}</td>
           <td style="text-align: center; font-weight: bold; color: ${colorSaldos};">${saldos}</td>
           <td style="text-align: right; color: var(--neon-green); font-weight: bold;">S/ ${totalNum.toFixed(2)}</td>
-          <td style="text-align: center;">
+          <td style="text-align: center; display: flex; justify-content: center; gap: 5px;">
+            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="descontarDesdeDashboard('${item.codigo}', '${descStr}', ${costoUnit}, ${std})" title="Descontar cantidad">
+              <i class="fa-solid fa-minus"></i>
+            </button>
             <button class="btn btn-success" style="padding: 4px 8px; font-size: 0.8rem;" onclick="completarLevante('${fechaStr}')" title="Marcar como Levantado">
               <i class="fa-solid fa-check"></i>
             </button>
@@ -430,4 +430,33 @@ async function approveUser(email, nombre, rol) {
 async function toggleUser(email, nuevoEstado) {
   const success = await apiService.updateUserStatus(email, nuevoEstado);
   if (success) { loadAdminData(); }
+}
+
+async function descontarDesdeDashboard(codigo, descripcion, costoUnitario, stdCaseQty) {
+  const input = prompt(`¿Cuántas unidades deseas descontar de:\n${descripcion}?`, "1");
+  if (input === null) return; 
+  
+  const cantToDiscount = parseFloat(input);
+  
+  if (isNaN(cantToDiscount) || cantToDiscount <= 0) {
+    return alert("Por favor, ingresa una cantidad válida mayor a 0.");
+  }
+
+  const data = {
+    usuario: currentUser,
+    codigo: codigo,
+    descripcion: descripcion,
+    cantidad: -cantToDiscount, 
+    costoUnitario: costoUnitario,
+    total: -cantToDiscount * costoUnitario,
+    stdCaseQty: parseFloat(stdCaseQty) || 0
+  };
+
+  const success = await apiService.saveSobrante(data);
+  if (success) {
+    alert("✅ Descuento registrado correctamente en el historial.");
+    loadDashboard(); 
+  } else {
+    alert("❌ Error al registrar el descuento.");
+  }
 }
