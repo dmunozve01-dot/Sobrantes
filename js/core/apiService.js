@@ -33,10 +33,26 @@ class APIService {
     } catch (err) { return false; }
   }
 
+  async updateSobranteStatus(fecha, estado) {
+    const url = await this.getBaseUrl(); if (!url) return false;
+    try {
+      await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "updateSobranteStatus", fecha, estado }) });
+      return true;
+    } catch (err) { return false; }
+  }
+
+  async updateAllSobrantesStatus(estado) {
+    const url = await this.getBaseUrl(); if (!url) return false;
+    try {
+      await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "updateAllSobrantesStatus", estado }) });
+      return true;
+    } catch (err) { return false; }
+  }
+
   async getSobrantes() {
     const url = await this.getBaseUrl(); if (!url) return [];
     try {
-      const res = await fetch(`${url}?action=getSobrantes`);
+      const res = await fetch(`${url}?action=getSobrantes&t=${new Date().getTime()}`);
       const json = await res.json();
       return json.success ? json.data : [];
     } catch (err) { return []; }
