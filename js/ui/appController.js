@@ -45,8 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', saveLevante);
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
-  
-  // EVENTOS PARA EL BOTÓN DE LEVANTAR TODO
   document.getElementById('btnCompleteAll').addEventListener('click', completarTodo);
 
   document.getElementById('btnAddUnit').addEventListener('click', () => {
@@ -166,7 +164,6 @@ async function loadDashboard() {
 
   try {
     const data = await apiService.getSobrantes();
-    
     const pendientes = data.filter(item => item.estado !== 'LEVANTADO');
 
     let totalSoles = 0;
@@ -214,7 +211,6 @@ async function loadDashboard() {
 
 async function completarLevante(fecha) {
   if (!confirm("¿Marcar este producto como LEVANTADO? Desaparecerá del dashboard.")) return;
-  
   const success = await apiService.updateSobranteStatus(fecha, 'LEVANTADO');
   if (success) {
     alert("✅ Producto marcado como levantado.");
@@ -224,7 +220,6 @@ async function completarLevante(fecha) {
   }
 }
 
-// NUEVA FUNCIÓN: LEVANTAR TODO
 async function completarTodo() {
   if (!confirm("⚠️ ¿Estás seguro de marcar TODOS los productos pendientes como LEVANTADOS?\n\nDesaparecerán del Dashboard pero se guardarán en el Historial.")) return;
 
@@ -328,13 +323,21 @@ async function loadAdminData() {
     reqList.innerHTML = '<p class="empty-msg">No hay solicitudes pendientes.</p>';
   } else {
     requests.forEach(req => {
+      // AQUÍ ESTÁ EL CAMBIO: DOS BOTONES CLAROS EN VEZ DE CONFIRM
       reqList.innerHTML += `
-        <div class="list-card" style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
+        <div class="list-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
+          <div style="flex: 1; min-width: 150px;">
             <strong style="display:block; font-size:0.9rem;">${req.nombre}</strong>
             <span style="font-size:0.8rem; color:var(--text-gray);">${req.email}</span>
           </div>
-          <button class="btn btn-success" style="padding:8px 12px; font-size:0.8rem;" onclick="approveUser('${req.email}', '${req.nombre}')">Aprobar</button>
+          <div style="display: flex; gap: 5px;">
+            <button class="btn btn-cancel" style="padding:6px 10px; font-size:0.75rem;" onclick="approveUser('${req.email}', '${req.nombre}', 'USER')" title="Aprobar como Operario">
+              <i class="fa-solid fa-user"></i> USER
+            </button>
+            <button class="btn btn-primary" style="padding:6px 10px; font-size:0.75rem;" onclick="approveUser('${req.email}', '${req.nombre}', 'ADMIN')" title="Aprobar como Administrador">
+              <i class="fa-solid fa-user-gear"></i> ADMIN
+            </button>
+          </div>
         </div>
       `;
     });
@@ -354,23 +357,28 @@ async function loadAdminData() {
       const btnText = isBlocked ? 'Desbloquear' : 'Bloquear';
       
       userList.innerHTML += `
-        <div class="list-card" style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
+        <div class="list-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
+          <div style="flex: 1; min-width: 150px;">
             <strong style="display:block; font-size:0.9rem;">${u.nombre} <span style="font-size:0.65rem; background:var(--bg-hover); padding:2px 4px; border-radius:4px;">${u.rol}</span></strong>
             <span style="font-size:0.8rem; color:var(--text-gray);">${u.email}</span>
-            <span style="color: ${badgeColor}; font-weight: bold; font-size: 0.75rem;">● ${u.estado}</span>
+            <div style="color: ${badgeColor}; font-weight: bold; font-size: 0.75rem; margin-top: 4px;">● ${u.estado}</div>
           </div>
-          <button class="btn btn-cancel" style="padding:8px 12px; font-size:0.8rem;" onclick="toggleUser('${u.email}', '${isBlocked ? 'ACTIVO' : 'BLOQUEADO'}')">${btnText}</button>
+          <button class="btn btn-cancel" style="padding:6px 10px; font-size:0.75rem;" onclick="toggleUser('${u.email}', '${isBlocked ? 'ACTIVO' : 'BLOQUEADO'}')">${btnText}</button>
         </div>
       `;
     });
   }
 }
 
-async function approveUser(email, nombre) {
-  const rol = confirm("¿Aprobar como ADMIN? (Aceptar = ADMIN, Cancelar = USER)");
-  const success = await apiService.approveUser({ email, nombre, rol: rol ? 'ADMIN' : 'USER' });
-  if (success) { alert("✅ Usuario aprobado."); loadAdminData(); } else { alert("❌ Error."); }
+// FUNCIÓN ACTUALIZADA: AHORA RECIBE EL ROL DIRECTAMENTE
+async function approveUser(email, nombre, rol) {
+  const success = await apiService.approveUser({ email, nombre, rol: rol });
+  if (success) {
+    alert(`✅ Usuario aprobado como ${rol}.`);
+    loadAdminData();
+  } else {
+    alert("❌ Error al aprobar.");
+  }
 }
 
 async function toggleUser(email, nuevoEstado) {
