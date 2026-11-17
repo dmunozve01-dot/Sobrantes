@@ -2,6 +2,7 @@ let html5QrCode;
 let currentUser = null;
 let currentProduct = null;
 let currentCosto = 0;
+let isCameraRunning = false; // Controla el estado de la cámara
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof checkSessionAndLoadUI === 'function') checkSessionAndLoadUI();
@@ -42,12 +43,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   html5QrCode = new Html5Qrcode("reader");
-  document.getElementById('btnStartCamera').addEventListener('click', startCamera);
+  
+  // EVENTO DEL BOTÓN INTERRUPTOR DE CÁMARA
+  document.getElementById('btnCameraToggle').addEventListener('click', toggleCamera);
+  
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', saveLevante);
   
-  // Evento para compartir reporte
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
 
   // BOTONES DE SUMA RÁPIDA
@@ -70,6 +73,139 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadDashboard();
 });
+
+// ================= LÓGICA DE ENCENDIDO/APAGADO DE CÁMARA =================
+async function toggleCamera() {
+  const btn = document.getElementById('btnCameraToggle');
+  const scanLine = document.getElementById('scanLine');
+
+  if (isCameraRunning) {
+    // APAGAR CÁMARA
+    try {
+      await html5QrCode.stop();
+      isCameraRunning = false;
+      scanLine.style.display = 'none';
+      btn.innerHTML = '<i class="fa-solid fa-camera"></i>';
+      btn.style.background = 'var(--neon-cyan)';
+    } catch (err) {
+      console.error("Error al apagar cámara:", err);
+    }
+  } else {
+    // ENCENDER CÁMARA
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" }, 
+        { fps: 15 }, 
+        onScanSuccess
+      );
+      isCameraRunning = true;
+      scanLine.style.display = 'block'; // Mostrar línea de escaneo
+      btn.innerHTML = '<i class="fa-solid fa-video-slash"></i>';
+      btn.style.background = 'var(--danger)'; // Botón rojo
+    } catch (err) {
+      alert("Error al abrir la cámara. Recuerda que debes usar HTTPS.");
+    }
+  }
+}
+
+// ================= LÓGICA DEL ESCÁNER =================
+async function onScanSuccess(decodedText) {
+  if (isCameraRunning) {
+    html5QrCode.pause();
+    document.getElementById('scanLine').style.display = 'none';
+  }
+
+  if (navigator.vibrate) navigator.vibrate(200);
+  
+  document.getElementById('prodDesc').innerText = "Buscando producto...";
+  document.getElementById('productSheet').classList.add('show');
+  
+  const res = await apiService.getProduct(decodedText);
+
+  if (res.success) {
+    currentProduct = res.producto;
+    currentCosto = res.producto.costo;
+    
+    const nombreMostrar = currentProduct.descripcion ? currentProduct.descripcion : "Producto sin nombre";
+    
+    document.getElementById('prodCode').innerText = decodedText;
+    document.getElementById('prodDesc').innerText = nombreMostrar;
+    document.getElementById('prodCost').innerText = `S/ ${currentCosto.toFixed(2)}`;
+    
+    const stdCase = currentProduct.stdCaseQty || 0;
+    const btnAddBox = document.getElementById('btnAddBox');
+    
+    if (stdCase > 0) {
+      document.getElementById('prodStdCase').innerText = stdCase;
+      btnAddBox.style.display = 'flex'; 
+    } else {
+      btnAddBox.style.display = 'none'; 
+    }
+
+    // INICIAMOS EN 0 PARA QUE NO SUME EL 1 AL AÑADIR BULTOS
+    document.getElementById('inputCantidad').value = 0;
+    calculateTotal();
+  } else {
+    alert("❌ Producto NO encontrado en la base de datos.");
+    closeBottomSheet();
+  }
+}
+
+function calculateTotal() {
+  const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
+  document.getElementById('totalCost').innerText = (cant * currentCosto).toFixed(2);
+}
+
+async function saveLevante() {
+  if (!currentProduct) return;
+  const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
+  if (cant <= 0) return alert("Ingresa una cantidad válida (mayor a 0).");
+
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+
+  const data = { 
+    usuario: currentUser, 
+    codigo: currentProduct.codigoEncontrado, 
+    descripcion: currentProduct.descripcion || "Sin nombre", 
+    cantidad: cant, 
+    costoUnitario: currentCosto, 
+    total: cant * currentCosto 
+  };
+  
+  const success = await apiService.saveSobrante(data);
+
+  if (success) {
+    alert("✅ Levante guardado correctamente.");
+    closeBottomSheet();
+    loadDashboard(); 
+  } else {
+    alert("❌ Error al guardar.");
+    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
+  }
+}
+
+function closeBottomSheet() {
+  currentProduct = null; 
+  currentCosto = 0;
+  
+  document.getElementById('productSheet').classList.remove('show');
+  document.getElementById('btnSave').disabled = false;
+  document.getElementById('btnSave').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
+  
+  // LIMPIAR FORMULARIO A 0
+  document.getElementById('prodDesc').innerText = 'Nombre del Producto';
+  document.getElementById('prodCode').innerText = '000000';
+  document.getElementById('prodCost').innerText = 'S/ 0.00';
+  document.getElementById('inputCantidad').value = '0';
+  document.getElementById('totalCost').innerText = '0.00';
+  
+  // SI LA CÁMARA ESTABA PRENDIDA, LA REANUDAMOS
+  if (isCameraRunning && html5QrCode) {
+    html5QrCode.resume();
+    document.getElementById('scanLine').style.display = 'block';
+  }
+}
 
 // ================= LÓGICA DEL DASHBOARD =================
 async function loadDashboard() {
@@ -160,111 +296,6 @@ async function shareReport() {
     btn.innerHTML = originalText;
     btn.disabled = false;
   }
-}
-
-// ================= LÓGICA DEL ESCÁNER =================
-async function startCamera() {
-  document.getElementById('btnStartCamera').style.display = 'none';
-  document.getElementById('scanLine').style.display = 'block';
-  
-  try {
-    await html5QrCode.start({ facingMode: "environment" }, { fps: 15 }, onScanSuccess);
-  } catch (err) {
-    alert("Error al abrir la cámara. Recuerda que debes usar HTTPS.");
-    document.getElementById('btnStartCamera').style.display = 'flex';
-    document.getElementById('scanLine').style.display = 'none';
-  }
-}
-
-async function onScanSuccess(decodedText) {
-  html5QrCode.pause();
-  if (navigator.vibrate) navigator.vibrate(200);
-  
-  document.getElementById('scanLine').style.display = 'none';
-
-  document.getElementById('prodDesc').innerText = "Buscando producto...";
-  document.getElementById('productSheet').classList.add('show');
-  
-  const res = await apiService.getProduct(decodedText);
-
-  if (res.success) {
-    currentProduct = res.producto;
-    currentCosto = res.producto.costo;
-    
-    const nombreMostrar = currentProduct.descripcion ? currentProduct.descripcion : "Producto sin nombre";
-    
-    document.getElementById('prodCode').innerText = decodedText;
-    document.getElementById('prodDesc').innerText = nombreMostrar;
-    document.getElementById('prodCost').innerText = `S/ ${currentCosto.toFixed(2)}`;
-    
-    const stdCase = currentProduct.stdCaseQty || 0;
-    const btnAddBox = document.getElementById('btnAddBox');
-    
-    if (stdCase > 0) {
-      document.getElementById('prodStdCase').innerText = stdCase;
-      btnAddBox.style.display = 'flex'; 
-    } else {
-      btnAddBox.style.display = 'none'; 
-    }
-
-    document.getElementById('inputCantidad').value = 1;
-    calculateTotal();
-  } else {
-    alert("❌ Producto NO encontrado en la base de datos.");
-    closeBottomSheet();
-  }
-}
-
-function calculateTotal() {
-  const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
-  document.getElementById('totalCost').innerText = (cant * currentCosto).toFixed(2);
-}
-
-async function saveLevante() {
-  if (!currentProduct) return;
-  const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
-  if (cant <= 0) return alert("Ingresa una cantidad válida.");
-
-  const btn = document.getElementById('btnSave');
-  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
-
-  const data = { 
-    usuario: currentUser, 
-    codigo: currentProduct.codigoEncontrado, 
-    descripcion: currentProduct.descripcion || "Sin nombre", 
-    cantidad: cant, 
-    costoUnitario: currentCosto, 
-    total: cant * currentCosto 
-  };
-  
-  const success = await apiService.saveSobrante(data);
-
-  if (success) {
-    alert("✅ Levante guardado correctamente.");
-    closeBottomSheet();
-    loadDashboard(); 
-  } else {
-    alert("❌ Error al guardar.");
-    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
-  }
-}
-
-function closeBottomSheet() {
-  currentProduct = null; 
-  currentCosto = 0;
-  
-  document.getElementById('productSheet').classList.remove('show');
-  document.getElementById('btnStartCamera').style.display = 'flex';
-  document.getElementById('btnSave').disabled = false;
-  document.getElementById('btnSave').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar';
-  
-  document.getElementById('prodDesc').innerText = 'Nombre del Producto';
-  document.getElementById('prodCode').innerText = '000000';
-  document.getElementById('prodCost').innerText = 'S/ 0.00';
-  document.getElementById('inputCantidad').value = '1';
-  document.getElementById('totalCost').innerText = '0.00';
-  
-  if (html5QrCode) html5QrCode.resume();
 }
 
 // ================= LÓGICA DEL HISTORIAL =================

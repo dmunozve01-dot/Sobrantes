@@ -83,7 +83,8 @@
         <div class="scan-line" id="scanLine"></div>
       </div>
       
-      <button class="btn-fab" id="btnStartCamera">
+      <!-- BOTÓN INTERRUPTOR DE CÁMARA -->
+      <button class="btn-fab" id="btnCameraToggle">
         <i class="fa-solid fa-camera"></i>
       </button>
       <p class="hint-text">Apunta la cámara al código de barras</p>
@@ -122,7 +123,8 @@
         </div>
         <div class="price-box input-box">
           <span>Cantidad Total</span>
-          <input type="number" id="inputCantidad" min="1" value="1">
+          <!-- INPUT INICIA EN 0 -->
+          <input type="number" id="inputCantidad" min="0" value="0">
         </div>
       </div>
 
