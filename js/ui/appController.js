@@ -143,7 +143,7 @@ async function saveLevante() {
     costoUnitario: currentCosto, 
     total: cant * currentCosto,
     stdCaseQty: currentProduct.stdCaseQty || 0,
-    motivo: "Levante de inventario" // Motivo por defecto para ingresos
+    motivo: "Ingreso por escáner" // Motivo claro para el historial
   };
   
   const success = await apiService.saveSobrante(data);
@@ -182,7 +182,6 @@ async function loadDashboard() {
     const data = await apiService.getSobrantes();
     const pendientes = data.filter(item => item.estado !== 'LEVANTADO');
 
-    // AGRUPAR LOS PRODUCTOS POR CÓDIGO
     const agrupados = {};
     let totalSoles = 0;
     let totalBultos = 0;
@@ -254,7 +253,7 @@ async function loadDashboard() {
           <td style="text-align: center; font-weight: bold; color: var(--neon-green);">${saldos}</td>
           <td style="text-align: right; color: var(--neon-green); font-weight: bold;">S/ ${item.total.toFixed(2)}</td>
           <td style="text-align: center; display: flex; justify-content: center; gap: 5px;">
-            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="descontarDesdeDashboard('${item.codigo}', '${descStr}', ${costoUnit}, ${item.stdCaseQty})" title="Descontar cantidad">
+            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="mostrarModalDescuento('${item.codigo}', '${descStr}', ${costoUnit}, ${item.stdCaseQty})" title="Descontar cantidad">
               <i class="fa-solid fa-minus"></i>
             </button>
             <button class="btn btn-success" style="padding: 4px 8px; font-size: 0.8rem;" onclick="completarLevanteMultiple('${fechasCodificadas}')" title="Marcar como Levantado">
@@ -308,6 +307,150 @@ async function completarTodo() {
   btn.innerHTML = originalText;
 }
 
+// ================= MODAL DE DESCUENTO (COMBOBOX) =================
+function mostrarModalDescuento(codigo, descripcion, costoUnitario, stdCaseQty) {
+  // Crear el contenedor del modal dinámicamente
+  const modal = document.createElement('div');
+  modal.id = 'modalDescuentoPersonalizado';
+  modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:9999; padding:20px; box-sizing:border-box;';
+
+  modal.innerHTML = `
+    <div style="background:#1a1a2e; padding:25px; border-radius:12px; width:100%; max-width:350px; color:#fff; border: 1px solid var(--danger, #ef4444); box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <h3 style="margin-top:0; color:var(--danger, #ef4444); font-size:1.2rem; display:flex; align-items:center; gap:8px;">
+        <i class="fa-solid fa-triangle-exclamation"></i> Registrar Descuento
+      </h3>
+      <p style="font-size:0.9rem; margin-bottom:20px; color:#cbd5e1; line-height:1.4;">${descripcion}</p>
+      
+      <label style="display:block; margin-bottom:8px; font-weight:bold; font-size:0.9rem;">Cantidad a descontar:</label>
+      <input type="number" id="descCantidad" min="1" value="1" style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#fff; font-size:1rem; box-sizing:border-box;">
+      
+      <label style="display:block; margin-bottom:8px; font-weight:bold; font-size:0.9rem;">Motivo del movimiento:</label>
+      <select id="descMotivo" style="width:100%; padding:10px; margin-bottom:25px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#fff; font-size:1rem; box-sizing:border-box;">
+        <option value="Error operativo / Mal escaneo">Error operativo / Mal escaneo</option>
+        <option value="Regularización de inventario">Regularización de inventario</option>
+        <option value="Producto dañado / Merma">Producto dañado / Merma</option>
+        <option value="Consumo interno">Consumo interno</option>
+        <option value="Ajuste administrativo">Ajuste administrativo</option>
+      </select>
+
+      <div style="display:flex; justify-content:space-between; gap:10px;">
+        <button id="btnCancelDesc" class="btn" style="flex:1; background:#475569; color:white; padding:10px; border-radius:6px;">Cancelar</button>
+        <button id="btnConfirmDesc" class="btn btn-danger" style="flex:1; padding:10px; border-radius:6px; font-weight:bold;">Confirmar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Botón Cancelar
+  document.getElementById('btnCancelDesc').addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+
+  // Botón Confirmar
+  document.getElementById('btnConfirmDesc').addEventListener('click', async () => {
+    const cant = parseFloat(document.getElementById('descCantidad').value);
+    const motivo = document.getElementById('descMotivo').value;
+
+    if (isNaN(cant) || cant <= 0) {
+      alert("Por favor, ingresa una cantidad válida mayor a 0.");
+      return;
+    }
+
+    const btnConf = document.getElementById('btnConfirmDesc');
+    btnConf.disabled = true;
+    btnConf.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+    const data = {
+      usuario: currentUser,
+      codigo: codigo,
+      descripcion: descripcion,
+      cantidad: -cant, // Lo enviamos en negativo
+      costoUnitario: costoUnitario,
+      total: -cant * costoUnitario,
+      stdCaseQty: parseFloat(stdCaseQty) || 0,
+      motivo: motivo
+    };
+
+    const success = await apiService.saveSobrante(data);
+    
+    if (success) {
+      alert("✅ Descuento registrado correctamente.");
+      document.body.removeChild(modal);
+      loadDashboard(); 
+    } else {
+      alert("❌ Error al registrar el descuento.");
+      btnConf.disabled = false;
+      btnConf.innerHTML = 'Confirmar';
+    }
+  });
+}
+
+// ================= HISTORIAL (ACTUALIZADO CON DETALLE DE MOVIMIENTOS) =================
+async function loadHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<p class="empty-msg">Cargando historial...</p>';
+  
+  try {
+    const data = await apiService.getSobrantes();
+    list.innerHTML = '';
+    if (!data || data.length === 0) {
+      list.innerHTML = '<p class="empty-msg">Aún no hay movimientos registrados.</p>';
+      return;
+    }
+
+    data.forEach(item => {
+      let fechaStr = item.fecha;
+      try { if(fechaStr && fechaStr !== "Sin fecha") fechaStr = new Date(fechaStr).toLocaleString('es-PE'); } catch(e) {}
+      
+      const totalNum = parseFloat(item.total) || 0;
+      const cantNum = parseFloat(item.cantidad) || 0;
+      const isLevantado = item.estado === 'LEVANTADO';
+      const isDiscount = cantNum < 0;
+      
+      // Indicador visual de si es Ingreso o Salida
+      let tipoMovimientoHtml = "";
+      if (isDiscount) {
+        tipoMovimientoHtml = `<span style="color: var(--danger, #ef4444); font-weight: bold;"><i class="fa-solid fa-arrow-trend-down"></i> Salida de inventario</span>`;
+      } else {
+        tipoMovimientoHtml = `<span style="color: var(--neon-green, #10b981); font-weight: bold;"><i class="fa-solid fa-arrow-trend-up"></i> Ingreso de inventario</span>`;
+      }
+
+      // Mostrar el motivo exacto guardado
+      const motivoTexto = item.motivo ? item.motivo : (isDiscount ? "Descuento general" : "Levante por escáner");
+
+      const badgeEstado = isLevantado 
+        ? `<span style="background: var(--neon-green); color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">LEVANTADO</span>` 
+        : `<span style="background: ${isDiscount ? 'var(--danger)' : 'var(--neon-cyan)'}; color: ${isDiscount ? '#fff' : '#000'}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">${isDiscount ? 'DESCONTADO' : 'PENDIENTE'}</span>`;
+
+      list.innerHTML += `
+        <div class="list-card" style="opacity: ${isLevantado ? '0.6' : '1'}; border-left: 4px solid ${isDiscount ? 'var(--danger)' : 'var(--neon-green)'};">
+          <div class="list-card-header">
+            <strong>${item.descripcion}</strong>
+            <span class="price" style="color: ${isDiscount ? 'var(--danger)' : 'var(--neon-green)'};">S/ ${totalNum.toFixed(2)}</span>
+          </div>
+          <div class="list-card-body" style="margin-bottom: 8px;">
+            <span><i class="fa-solid fa-barcode"></i> ${item.codigo}</span>
+            <span>Cant: <b style="color: ${isDiscount ? 'var(--danger)' : 'inherit'}; font-size: 1.1rem;">${cantNum}</b></span>
+          </div>
+          
+          <!-- Cuadro de detalle del movimiento -->
+          <div style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 8px;">
+            <div style="margin-bottom: 4px;">${tipoMovimientoHtml}</div>
+            <div style="color: #cbd5e1;"><i class="fa-regular fa-comment-dots"></i> <strong>Motivo:</strong> ${motivoTexto}</div>
+          </div>
+
+          <div class="list-card-footer">
+            <span>${badgeEstado}</span>
+            <span>${fechaStr}</span>
+          </div>
+        </div>
+      `;
+    });
+  } catch (error) {
+    list.innerHTML = '<p class="empty-msg" style="color:var(--danger)">Error al cargar el historial.</p>';
+  }
+}
+
 // ================= COMPARTIR =================
 async function shareReport() {
   const btn = document.getElementById('btnShareReport');
@@ -332,62 +475,6 @@ async function shareReport() {
     }, 'image/png');
   } catch (error) { alert("❌ Error al generar la imagen."); } 
   finally { btn.innerHTML = originalText; btn.disabled = false; }
-}
-
-// ================= HISTORIAL =================
-async function loadHistory() {
-  const list = document.getElementById('historyList');
-  list.innerHTML = '<p class="empty-msg">Cargando historial...</p>';
-  
-  try {
-    const data = await apiService.getSobrantes();
-    list.innerHTML = '';
-    if (!data || data.length === 0) {
-      list.innerHTML = '<p class="empty-msg">Aún no hay sobrantes registrados.</p>';
-      return;
-    }
-
-    data.forEach(item => {
-      let fechaStr = item.fecha;
-      try { if(fechaStr && fechaStr !== "Sin fecha") fechaStr = new Date(fechaStr).toLocaleString('es-PE'); } catch(e) {}
-      
-      const totalNum = parseFloat(item.total) || 0;
-      const cantNum = parseFloat(item.cantidad) || 0;
-      const isLevantado = item.estado === 'LEVANTADO';
-      const isDiscount = cantNum < 0;
-      
-      const badgeEstado = isLevantado 
-        ? `<span style="background: var(--neon-green); color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">LEVANTADO</span>` 
-        : `<span style="background: ${isDiscount ? 'var(--danger)' : 'var(--neon-cyan)'}; color: ${isDiscount ? '#fff' : '#000'}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">${isDiscount ? 'DESCUENTO' : 'PENDIENTE'}</span>`;
-
-      // Renderizar el motivo del descuento (si existe en la BD)
-      const motivoHtml = (item.motivo && isDiscount) 
-        ? `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 6px; font-style: italic; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px;">
-             <i class="fa-solid fa-comment-dots"></i> <strong>Motivo:</strong> ${item.motivo}
-           </div>` 
-        : '';
-
-      list.innerHTML += `
-        <div class="list-card" style="opacity: ${isLevantado ? '0.7' : '1'}; border-left: ${isDiscount ? '4px solid var(--danger)' : 'none'};">
-          <div class="list-card-header">
-            <strong>${item.descripcion}</strong>
-            <span class="price" style="color: ${isDiscount ? 'var(--danger)' : 'var(--neon-green)'};">S/ ${totalNum.toFixed(2)}</span>
-          </div>
-          <div class="list-card-body">
-            <span><i class="fa-solid fa-barcode"></i> ${item.codigo}</span>
-            <span>Cant: <b style="color: ${isDiscount ? 'var(--danger)' : 'inherit'};">${cantNum}</b></span>
-          </div>
-          ${motivoHtml}
-          <div class="list-card-footer" style="margin-top: 8px;">
-            <span>${badgeEstado}</span>
-            <span>${fechaStr}</span>
-          </div>
-        </div>
-      `;
-    });
-  } catch (error) {
-    list.innerHTML = '<p class="empty-msg" style="color:var(--danger)">Error al cargar el historial.</p>';
-  }
 }
 
 // ================= ADMIN =================
@@ -460,60 +547,4 @@ async function approveUser(email, nombre, rol) {
 async function toggleUser(email, nuevoEstado) {
   const success = await apiService.updateUserStatus(email, nuevoEstado);
   if (success) { loadAdminData(); }
-}
-
-async function descontarDesdeDashboard(codigo, descripcion, costoUnitario, stdCaseQty) {
-  // 1. Pedir la cantidad a descontar
-  const input = prompt(`¿Cuántas unidades deseas descontar de:\n${descripcion}?`, "1");
-  if (input === null) return; 
-  
-  const cantToDiscount = parseFloat(input);
-  
-  if (isNaN(cantToDiscount) || cantToDiscount <= 0) {
-    return alert("Por favor, ingresa una cantidad válida mayor a 0.");
-  }
-
-  // 2. Pedir el MOTIVO usando opciones numéricas rápidas
-  const menuMotivos = `¿Por qué estás descontando este producto? (Ingresa el NÚMERO):\n
-1️⃣ Regularización de inventario
-2️⃣ Consumo / Uso interno
-3️⃣ Merma / Producto dañado
-4️⃣ Error de escaneo
-5️⃣ Otro motivo`;
-
-  const opcionElegida = prompt(menuMotivos, "1");
-  if (opcionElegida === null) return; // Si cancela, no hacemos nada
-
-  let motivoStr = "";
-  switch(opcionElegida.trim()) {
-    case "1": motivoStr = "Regularización de inventario"; break;
-    case "2": motivoStr = "Consumo / Uso interno"; break;
-    case "3": motivoStr = "Merma / Producto dañado"; break;
-    case "4": motivoStr = "Error de escaneo"; break;
-    case "5": 
-      motivoStr = prompt("Especifica el motivo en texto:", "Otro");
-      if (!motivoStr) return; 
-      break;
-    default:
-      motivoStr = "Regularización de inventario"; // Opción por defecto si pone una letra o número raro
-  }
-
-  const data = {
-    usuario: currentUser,
-    codigo: codigo,
-    descripcion: descripcion,
-    cantidad: -cantToDiscount, 
-    costoUnitario: costoUnitario,
-    total: -cantToDiscount * costoUnitario,
-    stdCaseQty: parseFloat(stdCaseQty) || 0,
-    motivo: motivoStr // Enviamos el motivo elegido
-  };
-
-  const success = await apiService.saveSobrante(data);
-  if (success) {
-    alert("✅ Descuento registrado correctamente en el historial.");
-    loadDashboard(); 
-  } else {
-    alert("❌ Error al registrar el descuento.");
-  }
 }
