@@ -64,14 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Agregar evento para el buscador manual (mientras digitas)
-  const manualInput = document.getElementById('inputManualCode');
-  if (manualInput) {
-    manualInput.addEventListener('input', (e) => {
-      buscarCodigoManual(e.target.value.trim());
-    });
-  }
-
   loadDashboard();
 });
 
@@ -117,45 +109,16 @@ function mostrarProductoEnSheet(producto, codigoEscaneado) {
   document.getElementById('productSheet').classList.add('show');
 }
 
-async function onScanSuccess(decodedText) {
-  if (isCameraRunning) { html5QrCode.pause(); document.getElementById('scanLine').style.display = 'none'; }
-  if (navigator.vibrate) navigator.vibrate(200);
-  
-  document.getElementById('prodDesc').innerText = "Buscando producto...";
-  document.getElementById('productSheet').classList.add('show');
-  
-  const res = await apiService.getProduct(decodedText);
-
-  if (res.success) {
-    mostrarProductoEnSheet(res.producto, decodedText);
-  } else {
-    // 1. COPIAR AL PORTAPAPELES
-    try {
-      await navigator.clipboard.writeText(decodedText);
-    } catch(e) { console.log("Error al copiar", e); }
-    
-    alert(`❌ Producto NO encontrado.\n\nEl código [ ${decodedText} ] ha sido copiado. Intente buscarlo manualmente.`);
-    closeBottomSheet();
-    
-    // 2. PEGAR EN EL BUSCADOR Y ENFOCAR
-    const manualInput = document.getElementById('inputManualCode');
-    if (manualInput) {
-      manualInput.value = decodedText; 
-      manualInput.focus();
-      buscarCodigoManual(decodedText);
-    }
-  }
-}
-
-// ================= BÚSQUEDA MANUAL DINÁMICA CON PESTAÑITA =================
+// ================= 1. BÚSQUEDA MANUAL MULTI-CAMPO =================
 let searchTimeout;
-window.tempDropdownProduct = null; // Guarda el producto temporalmente
+window.tempDropdownProducts = {}; 
 
-function buscarCodigoManual(codigo) {
+function buscarCodigoManual(texto) {
   const resultDiv = document.getElementById('manualSearchResult');
   const dropdown = document.getElementById('manualSearchDropdown');
-  
-  if (codigo.length < 3) {
+  const cleanCode = texto.trim();
+
+  if (cleanCode.length < 3) {
     resultDiv.innerText = "";
     dropdown.style.display = 'none';
     return;
@@ -163,49 +126,94 @@ function buscarCodigoManual(codigo) {
   
   resultDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando...';
   dropdown.style.display = 'none';
-  
   clearTimeout(searchTimeout);
   
+  const isNumber = /^\d+$/.test(cleanCode);
+  const delay = (isNumber && (cleanCode.length === 6 || cleanCode.length === 8)) ? 200 : 700;
+  
   searchTimeout = setTimeout(async () => {
-    const res = await apiService.getProduct(codigo);
+    const res = await apiService.getProduct(cleanCode);
     
-    if (res.success) {
+    if (res.success && res.productos && res.productos.length > 0) {
       resultDiv.innerText = '';
+      window.tempDropdownProducts = {};
+      let htmlLista = '';
       
-      // Diseñamos la opción desplegable 
-      dropdown.innerHTML = `
-        <li style="padding: 12px 15px; border-bottom: 1px solid #334155; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: background 0.2s;" 
-            onmouseover="this.style.background='#1e293b'" 
-            onmouseout="this.style.background='transparent'"
-            onclick="seleccionarProductoDropdown('${codigo}')">
-          <strong style="color: var(--neon-cyan); font-size: 1rem;">${codigo} - ${res.producto.descripcion}</strong>
-        </li>
-      `;
+      res.productos.forEach((prod, index) => {
+        const idTemp = 'prod_' + index;
+        window.tempDropdownProducts[idTemp] = prod;
+        
+        htmlLista += `
+          <li style="padding: 12px 15px; border-bottom: 1px solid #334155; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: background 0.2s;" 
+              onmouseover="this.style.background='#1e293b'" 
+              onmouseout="this.style.background='transparent'"
+              onclick="seleccionarProductoDropdown('${idTemp}', '${prod.codigo}')">
+            <strong style="color: var(--neon-cyan); font-size: 1rem;">${prod.codigo}</strong>
+            <span style="color: #cbd5e1; font-size: 0.85rem;">${prod.descripcion}</span>
+          </li>
+        `;
+      });
       
-      window.tempDropdownProduct = res.producto; // Lo guardamos
-      dropdown.style.display = 'block'; // Mostramos la pestañita
+      dropdown.innerHTML = htmlLista;
+      dropdown.style.display = 'block'; 
     } else {
       resultDiv.innerHTML = '❌ Producto no encontrado';
       dropdown.style.display = 'none';
     }
-  }, 600); // Espera 0.6 segundos para no saturar al tipear
+  }, delay);
 }
 
-// Función que se ejecuta cuando el usuario TOCA la opción en la lista desplegable
-window.seleccionarProductoDropdown = function(codigo) {
+window.seleccionarProductoDropdown = function(idTemp, codigoReal) {
    const dropdown = document.getElementById('manualSearchDropdown');
    const input = document.getElementById('inputManualCode');
+   const prodSeleccionado = window.tempDropdownProducts[idTemp];
    
-   // 1. Ocultar la lista
    dropdown.style.display = 'none';
-   // 2. Mostrar el código en el input
-   input.value = codigo;
+   input.value = codigoReal; 
    
-   // 3. Levantar la hoja inferior para agregar cantidad
-   if (window.tempDropdownProduct) {
-     mostrarProductoEnSheet(window.tempDropdownProduct, codigo);
+   if (prodSeleccionado) {
+     // Llama a tu función original para procesar/mostrar el producto
+     mostrarProductoEnSheet(prodSeleccionado, codigoReal); 
    }
 };
+
+// ================= 2. ÉXITO AL ESCANEAR CON CÁMARA =================
+async function onScanSuccess(decodedText, decodedResult) {
+  if (decodedText === window.ultimoCodigoEscaneado) return;
+  window.ultimoCodigoEscaneado = decodedText;
+  
+  if (navigator.vibrate) navigator.vibrate(100);
+
+  const res = await apiService.getProduct(decodedText);
+  
+  // Ahora valida y lee res.productos[0]
+  if (res.success && res.productos && res.productos.length > 0) {
+    const productoEscaneado = res.productos[0]; 
+    mostrarProductoEnSheet(productoEscaneado, decodedText);
+    
+    // Si usas una librería como html5QrCode para detener la cámara, se llama aquí:
+    // html5QrCode.pause();
+    // document.getElementById('scanLine').style.display = 'none';
+  } else {
+    // Si no lo encuentra, copiamos el código al portapapeles y avisamos
+    try {
+      await navigator.clipboard.writeText(decodedText);
+    } catch(e) { console.log("Error al copiar", e); }
+    
+    alert(`❌ Producto NO encontrado.
+
+El código [ ${decodedText} ] ha sido copiado. Intente buscarlo manualmente.`);
+    closeBottomSheet();
+    
+    const manualInput = document.getElementById('inputManualCode');
+    if (manualInput) {
+      manualInput.value = decodedText; 
+      manualInput.focus();
+      buscarCodigoManual(decodedText);
+    }
+    window.ultimoCodigoEscaneado = ""; 
+  }
+}
 
 function calculateTotal() {
   const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
@@ -224,7 +232,7 @@ async function saveLevante() {
 
   const data = { 
     usuario: currentUser, 
-    codigo: currentProduct.codigoEncontrado || currentProduct.codigo, // Aseguramos usar un código
+    codigo: currentProduct.codigoEncontrado || currentProduct.codigo, 
     descripcion: currentProduct.descripcion || "Sin nombre", 
     cantidad: cant, 
     costoUnitario: currentCosto, 
@@ -258,13 +266,15 @@ function closeBottomSheet() {
   document.getElementById('inputCantidad').value = '0';
   document.getElementById('totalCost').innerText = '0.00';
   
-  // Limpiar el buscador manual también al cerrar
   const inputManual = document.getElementById('inputManualCode');
   if(inputManual) inputManual.value = '';
   const resultDiv = document.getElementById('manualSearchResult');
   if(resultDiv) resultDiv.innerText = '';
   
-  if (isCameraRunning && html5QrCode) { html5QrCode.resume(); document.getElementById('scanLine').style.display = 'block'; }
+  if (isCameraRunning && html5QrCode) { 
+      try { html5QrCode.resume(); } catch(e) {}
+      document.getElementById('scanLine').style.display = 'block'; 
+  }
 }
 
 // ================= DASHBOARD =================
@@ -337,7 +347,7 @@ async function loadDashboard() {
 
       const costoUnit = item.cantidad !== 0 ? (item.total / item.cantidad) : 0;
       const fechasCodificadas = encodeURIComponent(JSON.stringify(item.fechas));
-      const descStr = item.descripcion.replace(/'/g, "\\'");
+      const descStr = item.descripcion.replace(/'/g, "\'");
       
       dashList.innerHTML += `
         <tr>

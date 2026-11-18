@@ -75,32 +75,32 @@
       </div>
     </section>
 
-    <section id="panelScanner" class="view hidden" style="display: flex; flex-direction: column; height: 100vh; padding-bottom: 80px; box-sizing: border-box; overflow-y: auto;">
+    <section id="panelScanner" class="view hidden" style="position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; overflow: hidden; background: #000;">
       
-      <!-- BUSCADOR ARRIBA CON PESTAÑA DESPLEGABLE -->
-      <div style="padding: 15px 20px; z-index: 50;">
+      <!-- BUSCADOR SUPERPUESTO (Flotante) -->
+      <div style="position: absolute; top: 15px; left: 0; width: 100%; padding: 0 20px; box-sizing: border-box; z-index: 50;">
         <div style="position: relative; width: 100%; max-width: 400px; margin: 0 auto;">
-          <input type="text" id="inputManualCode" placeholder="🔍 Escribe el SKU o código..." style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid var(--neon-cyan); background: var(--bg-hover, #1e293b); color: var(--text-main, #fff); font-size: 1.1rem; outline: none; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+          <input type="text" id="inputManualCode" placeholder="🔍 Buscar código, barra o descripción..." style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid var(--neon-cyan); background: rgba(15, 23, 42, 0.85); color: #fff; font-size: 1.1rem; outline: none; backdrop-filter: blur(5px); box-shadow: 0 4px 10px rgba(0,0,0,0.5);" onkeyup="buscarCodigoManual(this.value)">
           
-          <!-- LA PESTAÑITA (Lista Desplegable) -->
-          <ul id="manualSearchDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; width: 100%; background: #0f172a; border: 1px solid #475569; border-radius: 8px; margin: 0; padding: 0; list-style: none; max-height: 250px; overflow-y: auto; text-align: left; box-shadow: 0 10px 25px rgba(0,0,0,0.8); z-index: 100;">
+          <ul id="manualSearchDropdown" style="display: none; position: absolute; top: calc(100% + 5px); left: 0; width: 100%; background: #0f172a; border: 1px solid #475569; border-radius: 8px; margin: 0; padding: 0; list-style: none; max-height: 250px; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.8); z-index: 100;">
           </ul>
         </div>
-        <div id="manualSearchResult" style="margin-top: 5px; color: var(--text-gray); font-size: 0.85rem; min-height: 20px; text-align: center;"></div>
+        <div id="manualSearchResult" style="margin-top: 5px; color: var(--neon-cyan); font-weight: bold; font-size: 0.9rem; text-align: center; text-shadow: 1px 1px 3px #000;"></div>
       </div>
 
-      <!-- CÁMARA CENTRADA -->
-      <div class="camera-container" style="flex: 1; display: flex; flex-direction: column; justify-content: center; position: relative;">
-        <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
+      <!-- CÁMARA CENTRADA (No se empuja hacia abajo) -->
+      <div style="flex: 1; width: 100%; max-width: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; padding-top: 60px;">
+        
+        <div id="reader" style="width: 100%;"></div>
         <div class="scan-line" id="scanLine" style="display: none;"></div>
-      </div>
-      
-      <!-- BOTÓN CÁMARA ABAJO -->
-      <div style="text-align: center; padding-bottom: 20px;">
-        <button class="btn-fab" id="btnCameraToggle" style="position: relative; margin: 0 auto; transform: none; bottom: 0; left: 0;">
-          <i class="fa-solid fa-camera"></i>
-        </button>
-        <p class="hint-text" style="margin-top: 10px; margin-bottom: 0;">Apunta la cámara al código de barras</p>
+        
+        <div style="margin-top: 25px; text-align: center;">
+          <button class="btn-fab" id="btnCameraToggle" style="position: static; margin: 0 auto; transform: none;">
+            <i class="fa-solid fa-camera"></i>
+          </button>
+          <p class="hint-text" style="margin-top: 10px;">Apunta la cámara al código</p>
+        </div>
+        
       </div>
     </section>
 
