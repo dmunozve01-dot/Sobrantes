@@ -75,22 +75,23 @@
       </div>
     </section>
 
-    <!-- PANTALLA: ESCÁNER (NUEVA ESTRUCTURA) -->
     <section id="panelScanner" class="view hidden">
       <div class="scanner-wrapper">
         
-        <!-- Buscador Flotante (Cristal) -->
         <div class="search-overlay">
-          <input type="text" id="inputManualCode" placeholder="🔍 Buscar código, barra o descripción..." onkeyup="buscarCodigoManual(this.value)" autocomplete="off">
+          <div class="search-input-container">
+            <input type="text" id="inputManualCode" placeholder="🔍 Buscar código, barra o descripción..." onkeyup="buscarCodigoManual(this.value)" autocomplete="off">
+            <button id="btnClearSearch" class="btn-clear-search" onclick="limpiarBuscador()">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
           <ul id="manualSearchDropdown"></ul>
           <div id="manualSearchResult"></div>
         </div>
 
-        <!-- Cámara -->
         <div id="reader"></div>
         <div class="scan-line" id="scanLine"></div>
         
-        <!-- Controles de Cámara -->
         <div class="scanner-controls">
           <button class="btn-fab" id="btnCameraToggle">
             <i class="fa-solid fa-camera"></i>

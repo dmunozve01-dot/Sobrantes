@@ -120,16 +120,39 @@ function mostrarProductoEnSheet(producto, codigoEscaneado) {
   document.getElementById('productSheet').classList.add('show');
 }
 
-// ================= BÚSQUEDA MANUAL (SÚPER RÁPIDA) =================
+// ================= BÚSQUEDA MANUAL =================
 let searchTimeout;
 window.tempDropdownProducts = {}; 
+
+window.limpiarBuscador = function() {
+  const input = document.getElementById('inputManualCode');
+  const dropdown = document.getElementById('manualSearchDropdown');
+  const resultDiv = document.getElementById('manualSearchResult');
+  const btnClear = document.getElementById('btnClearSearch');
+  
+  input.value = '';
+  dropdown.style.display = 'none';
+  resultDiv.innerText = '';
+  btnClear.style.display = 'none';
+  input.focus();
+
+  // RESETEAMOS EL ÚLTIMO CÓDIGO Y REANUDAMOS LA CÁMARA
+  window.ultimoCodigoEscaneado = ""; 
+  if (isCameraRunning && html5QrCode) {
+    try { html5QrCode.resume(); } catch(e) {}
+    document.getElementById('scanLine').style.display = 'block';
+  }
+};
 
 function buscarCodigoManual(texto) {
   const resultDiv = document.getElementById('manualSearchResult');
   const dropdown = document.getElementById('manualSearchDropdown');
+  const btnClear = document.getElementById('btnClearSearch');
   const cleanCode = texto.trim();
 
-  // Si borra todo, limpiamos
+  if (cleanCode.length > 0) btnClear.style.display = 'block';
+  else btnClear.style.display = 'none';
+
   if (cleanCode.length < 2) {
     resultDiv.innerText = "";
     dropdown.style.display = 'none';
@@ -139,11 +162,6 @@ function buscarCodigoManual(texto) {
   resultDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando...';
   dropdown.style.display = 'none';
   clearTimeout(searchTimeout);
-  
-  // Magia: Si es un número de 6 dígitos o más, busca de inmediato (150ms).
-  // Si es texto, espera a que termine de escribir (350ms).
-  const isNumber = /^\d+$/.test(cleanCode);
-  const delay = (isNumber && cleanCode.length >= 6) ? 150 : 350;
   
   searchTimeout = setTimeout(async () => {
     const res = await apiService.getProduct(cleanCode);
@@ -172,7 +190,7 @@ function buscarCodigoManual(texto) {
       resultDiv.innerHTML = '❌ Producto no encontrado';
       dropdown.style.display = 'none';
     }
-  }, delay);
+  }, 300);
 }
 
 window.seleccionarProductoDropdown = function(idTemp, codigoReal) {
@@ -188,25 +206,30 @@ window.seleccionarProductoDropdown = function(idTemp, codigoReal) {
    }
 };
 
-// ================= ESCANEO CON CÁMARA =================
+// ================= ESCANEO CON CÁMARA (SIN BUCLE INFINITO) =================
 async function onScanSuccess(decodedText, decodedResult) {
+  // 1. Si ya estamos procesando este código, no hacer nada
   if (decodedText === window.ultimoCodigoEscaneado) return;
   window.ultimoCodigoEscaneado = decodedText;
-  
+
+  // 2. Pausar la cámara INMEDIATAMENTE para evitar que siga escaneando
+  if (isCameraRunning) { 
+    html5QrCode.pause(); 
+    document.getElementById('scanLine').style.display = 'none'; 
+  }
+
   if (navigator.vibrate) navigator.vibrate(100);
 
   const res = await apiService.getProduct(decodedText);
   
   if (res.success && res.productos && res.productos.length > 0) {
+    // ENCONTRADO
     const productoEscaneado = res.productos[0]; 
     mostrarProductoEnSheet(productoEscaneado, decodedText);
-    
-    if (isCameraRunning) { 
-      html5QrCode.pause(); 
-      document.getElementById('scanLine').style.display = 'none'; 
-    }
   } else {
+    // NO ENCONTRADO (Solo se ejecuta una vez gracias a la pausa)
     try { await navigator.clipboard.writeText(decodedText); } catch(e) {}
+    
     alert(`❌ Producto NO encontrado.\n\nEl código [ ${decodedText} ] ha sido copiado. Intente buscarlo manualmente.`);
     
     const manualInput = document.getElementById('inputManualCode');
@@ -214,7 +237,6 @@ async function onScanSuccess(decodedText, decodedResult) {
       manualInput.value = decodedText; 
       buscarCodigoManual(decodedText);
     }
-    window.ultimoCodigoEscaneado = ""; 
   }
 }
 
@@ -269,15 +291,7 @@ function closeBottomSheet() {
   document.getElementById('inputCantidad').value = '0';
   document.getElementById('totalCost').innerText = '0.00';
   
-  const inputManual = document.getElementById('inputManualCode');
-  if(inputManual) inputManual.value = '';
-  const resultDiv = document.getElementById('manualSearchResult');
-  if(resultDiv) resultDiv.innerText = '';
-  
-  if (isCameraRunning && html5QrCode) { 
-      try { html5QrCode.resume(); } catch(e) {}
-      document.getElementById('scanLine').style.display = 'block'; 
-  }
+  limpiarBuscador(); // Usa la función que también resetea y reanuda la cámara
 }
 
 // ================= DASHBOARD =================
