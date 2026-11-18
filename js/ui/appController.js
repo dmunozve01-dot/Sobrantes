@@ -147,34 +147,65 @@ async function onScanSuccess(decodedText) {
   }
 }
 
-// ================= BÚSQUEDA MANUAL DINÁMICA =================
+// ================= BÚSQUEDA MANUAL DINÁMICA CON PESTAÑITA =================
 let searchTimeout;
+window.tempDropdownProduct = null; // Guarda el producto temporalmente
+
 function buscarCodigoManual(codigo) {
   const resultDiv = document.getElementById('manualSearchResult');
+  const dropdown = document.getElementById('manualSearchDropdown');
   
-  if (codigo.length < 4) {
+  if (codigo.length < 3) {
     resultDiv.innerText = "";
+    dropdown.style.display = 'none';
     return;
   }
   
   resultDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando...';
+  dropdown.style.display = 'none';
   
   clearTimeout(searchTimeout);
   
   searchTimeout = setTimeout(async () => {
     const res = await apiService.getProduct(codigo);
+    
     if (res.success) {
-      resultDiv.innerHTML = `✅ ${res.producto.descripcion}`;
-      setTimeout(() => {
-         document.getElementById('inputManualCode').value = '';
-         resultDiv.innerText = '';
-         mostrarProductoEnSheet(res.producto, codigo); 
-      }, 500);
+      resultDiv.innerText = '';
+      
+      // Diseñamos la opción desplegable 
+      dropdown.innerHTML = `
+        <li style="padding: 12px 15px; border-bottom: 1px solid #334155; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: background 0.2s;" 
+            onmouseover="this.style.background='#1e293b'" 
+            onmouseout="this.style.background='transparent'"
+            onclick="seleccionarProductoDropdown('${codigo}')">
+          <strong style="color: var(--neon-cyan); font-size: 1rem;">${codigo} - ${res.producto.descripcion}</strong>
+        </li>
+      `;
+      
+      window.tempDropdownProduct = res.producto; // Lo guardamos
+      dropdown.style.display = 'block'; // Mostramos la pestañita
     } else {
-      resultDiv.innerHTML = '❌ No encontrado';
+      resultDiv.innerHTML = '❌ Producto no encontrado';
+      dropdown.style.display = 'none';
     }
-  }, 700);
+  }, 600); // Espera 0.6 segundos para no saturar al tipear
 }
+
+// Función que se ejecuta cuando el usuario TOCA la opción en la lista desplegable
+window.seleccionarProductoDropdown = function(codigo) {
+   const dropdown = document.getElementById('manualSearchDropdown');
+   const input = document.getElementById('inputManualCode');
+   
+   // 1. Ocultar la lista
+   dropdown.style.display = 'none';
+   // 2. Mostrar el código en el input
+   input.value = codigo;
+   
+   // 3. Levantar la hoja inferior para agregar cantidad
+   if (window.tempDropdownProduct) {
+     mostrarProductoEnSheet(window.tempDropdownProduct, codigo);
+   }
+};
 
 function calculateTotal() {
   const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
@@ -226,6 +257,13 @@ function closeBottomSheet() {
   document.getElementById('prodCost').innerText = 'S/ 0.00';
   document.getElementById('inputCantidad').value = '0';
   document.getElementById('totalCost').innerText = '0.00';
+  
+  // Limpiar el buscador manual también al cerrar
+  const inputManual = document.getElementById('inputManualCode');
+  if(inputManual) inputManual.value = '';
+  const resultDiv = document.getElementById('manualSearchResult');
+  if(resultDiv) resultDiv.innerText = '';
+  
   if (isCameraRunning && html5QrCode) { html5QrCode.resume(); document.getElementById('scanLine').style.display = 'block'; }
 }
 
