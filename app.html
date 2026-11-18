@@ -78,20 +78,26 @@
     <section id="panelScanner" class="view hidden">
       <div class="scanner-wrapper">
         
+        <!-- Buscador Flotante -->
         <div class="search-overlay">
           <div class="search-input-container">
             <input type="text" id="inputManualCode" placeholder="🔍 Buscar código, barra o descripción..." onkeyup="buscarCodigoManual(this.value)" autocomplete="off">
-            <button id="btnClearSearch" class="btn-clear-search" onclick="limpiarBuscador()">
-              <i class="fa-solid fa-xmark"></i>
+            
+            <!-- LA X CON ESTILO FORZADO EN LÍNEA PARA QUE NO SE SALGA -->
+            <button id="btnClearSearch" onclick="limpiarBuscador()" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; display: none; padding: 5px; z-index: 10;">
+              <i class="fa-solid fa-circle-xmark"></i>
             </button>
+            
           </div>
           <ul id="manualSearchDropdown"></ul>
           <div id="manualSearchResult"></div>
         </div>
 
+        <!-- Cámara -->
         <div id="reader"></div>
         <div class="scan-line" id="scanLine"></div>
         
+        <!-- Controles -->
         <div class="scanner-controls">
           <button class="btn-fab" id="btnCameraToggle">
             <i class="fa-solid fa-camera"></i>
