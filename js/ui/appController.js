@@ -30,6 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
     [panelDashboard, panelScanner, panelHistory, panelAdmin].forEach(panel => { if(panel) panel.classList.add('hidden'); });
     activeNav.classList.add('active');
     activePanel.classList.remove('hidden');
+
+    // APAGAR CÁMARA AL SALIR DE LA PESTAÑA ESCANEAR
+    if (activePanel !== panelScanner && isCameraRunning) {
+      apagarCamara();
+    }
   }
 
   navDashboard.addEventListener('click', () => { switchTab(navDashboard, panelDashboard); loadDashboard(); });
@@ -43,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnCameraToggle').addEventListener('click', toggleCamera);
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
-  
   document.getElementById('btnSave').addEventListener('click', () => saveLevante());
   
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
@@ -67,11 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
 });
 
-// ================= CÁMARA Y BÚSQUEDA =================
-async function toggleCamera() {
+// ================= CÁMARA =================
+async function apagarCamara() {
   const btn = document.getElementById('btnCameraToggle');
   const scanLine = document.getElementById('scanLine');
-
   if (isCameraRunning) {
     try {
       await html5QrCode.stop();
@@ -80,6 +83,15 @@ async function toggleCamera() {
       btn.innerHTML = '<i class="fa-solid fa-camera"></i>';
       btn.style.background = 'var(--neon-cyan)';
     } catch (err) {}
+  }
+}
+
+async function toggleCamera() {
+  const btn = document.getElementById('btnCameraToggle');
+  const scanLine = document.getElementById('scanLine');
+
+  if (isCameraRunning) {
+    await apagarCamara();
   } else {
     try {
       await html5QrCode.start({ facingMode: "environment" }, { fps: 15 }, onScanSuccess);
@@ -91,7 +103,6 @@ async function toggleCamera() {
   }
 }
 
-// Muestra el panel inferior (BottomSheet) con los datos del producto
 function mostrarProductoEnSheet(producto, codigoEscaneado) {
   currentProduct = producto;
   currentCosto = producto.costo;
@@ -109,7 +120,7 @@ function mostrarProductoEnSheet(producto, codigoEscaneado) {
   document.getElementById('productSheet').classList.add('show');
 }
 
-// ================= 1. BÚSQUEDA MANUAL MULTI-CAMPO =================
+// ================= BÚSQUEDA MANUAL (SÚPER RÁPIDA) =================
 let searchTimeout;
 window.tempDropdownProducts = {}; 
 
@@ -118,7 +129,8 @@ function buscarCodigoManual(texto) {
   const dropdown = document.getElementById('manualSearchDropdown');
   const cleanCode = texto.trim();
 
-  if (cleanCode.length < 3) {
+  // Si borra todo, limpiamos
+  if (cleanCode.length < 2) {
     resultDiv.innerText = "";
     dropdown.style.display = 'none';
     return;
@@ -128,8 +140,10 @@ function buscarCodigoManual(texto) {
   dropdown.style.display = 'none';
   clearTimeout(searchTimeout);
   
+  // Magia: Si es un número de 6 dígitos o más, busca de inmediato (150ms).
+  // Si es texto, espera a que termine de escribir (350ms).
   const isNumber = /^\d+$/.test(cleanCode);
-  const delay = (isNumber && (cleanCode.length === 6 || cleanCode.length === 8)) ? 200 : 700;
+  const delay = (isNumber && cleanCode.length >= 6) ? 150 : 350;
   
   searchTimeout = setTimeout(async () => {
     const res = await apiService.getProduct(cleanCode);
@@ -144,9 +158,7 @@ function buscarCodigoManual(texto) {
         window.tempDropdownProducts[idTemp] = prod;
         
         htmlLista += `
-          <li style="padding: 12px 15px; border-bottom: 1px solid #334155; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: background 0.2s;" 
-              onmouseover="this.style.background='#1e293b'" 
-              onmouseout="this.style.background='transparent'"
+          <li style="padding: 12px 15px; border-bottom: 1px solid #334155; cursor: pointer; display: flex; flex-direction: column; gap: 4px;" 
               onclick="seleccionarProductoDropdown('${idTemp}', '${prod.codigo}')">
             <strong style="color: var(--neon-cyan); font-size: 1rem;">${prod.codigo}</strong>
             <span style="color: #cbd5e1; font-size: 0.85rem;">${prod.descripcion}</span>
@@ -172,12 +184,11 @@ window.seleccionarProductoDropdown = function(idTemp, codigoReal) {
    input.value = codigoReal; 
    
    if (prodSeleccionado) {
-     // Llama a tu función original para procesar/mostrar el producto
      mostrarProductoEnSheet(prodSeleccionado, codigoReal); 
    }
 };
 
-// ================= 2. ÉXITO AL ESCANEAR CON CÁMARA =================
+// ================= ESCANEO CON CÁMARA =================
 async function onScanSuccess(decodedText, decodedResult) {
   if (decodedText === window.ultimoCodigoEscaneado) return;
   window.ultimoCodigoEscaneado = decodedText;
@@ -186,29 +197,21 @@ async function onScanSuccess(decodedText, decodedResult) {
 
   const res = await apiService.getProduct(decodedText);
   
-  // Ahora valida y lee res.productos[0]
   if (res.success && res.productos && res.productos.length > 0) {
     const productoEscaneado = res.productos[0]; 
     mostrarProductoEnSheet(productoEscaneado, decodedText);
     
-    // Si usas una librería como html5QrCode para detener la cámara, se llama aquí:
-    // html5QrCode.pause();
-    // document.getElementById('scanLine').style.display = 'none';
+    if (isCameraRunning) { 
+      html5QrCode.pause(); 
+      document.getElementById('scanLine').style.display = 'none'; 
+    }
   } else {
-    // Si no lo encuentra, copiamos el código al portapapeles y avisamos
-    try {
-      await navigator.clipboard.writeText(decodedText);
-    } catch(e) { console.log("Error al copiar", e); }
-    
-    alert(`❌ Producto NO encontrado.
-
-El código [ ${decodedText} ] ha sido copiado. Intente buscarlo manualmente.`);
-    closeBottomSheet();
+    try { await navigator.clipboard.writeText(decodedText); } catch(e) {}
+    alert(`❌ Producto NO encontrado.\n\nEl código [ ${decodedText} ] ha sido copiado. Intente buscarlo manualmente.`);
     
     const manualInput = document.getElementById('inputManualCode');
     if (manualInput) {
       manualInput.value = decodedText; 
-      manualInput.focus();
       buscarCodigoManual(decodedText);
     }
     window.ultimoCodigoEscaneado = ""; 
@@ -232,7 +235,7 @@ async function saveLevante() {
 
   const data = { 
     usuario: currentUser, 
-    codigo: currentProduct.codigoEncontrado || currentProduct.codigo, 
+    codigo: currentProduct.codigo || currentProduct.codigoEncontrado, 
     descripcion: currentProduct.descripcion || "Sin nombre", 
     cantidad: cant, 
     costoUnitario: currentCosto, 
@@ -384,7 +387,7 @@ async function completarLevanteMultiple(fechasCodificadas) {
   }
 
   if (hasError) {
-    alert("⚠️ Hubo un problema al actualizar algunos registros. Recarga e intenta de nuevo.");
+    alert("⚠️ Hubo un problema al actualizar algunos registros.");
   } else {
     alert("✅ Producto marcado como levantado.");
   }
@@ -411,7 +414,7 @@ async function completarTodo() {
   btn.innerHTML = originalText;
 }
 
-// ================= MODAL DE DESCUENTO (COMBOBOX) =================
+// ================= MODAL DE DESCUENTO =================
 function mostrarModalDescuento(codigo, descripcion, costoUnitario, stdCaseQty) {
   const modal = document.createElement('div');
   modal.id = 'modalDescuentoPersonalizado';
@@ -444,18 +447,13 @@ function mostrarModalDescuento(codigo, descripcion, costoUnitario, stdCaseQty) {
   `;
   document.body.appendChild(modal);
 
-  document.getElementById('btnCancelDesc').addEventListener('click', () => {
-    document.body.removeChild(modal);
-  });
+  document.getElementById('btnCancelDesc').addEventListener('click', () => document.body.removeChild(modal));
 
   document.getElementById('btnConfirmDesc').addEventListener('click', async () => {
     const cant = parseFloat(document.getElementById('descCantidad').value);
     const motivo = document.getElementById('descMotivo').value;
 
-    if (isNaN(cant) || cant <= 0) {
-      alert("Por favor, ingresa una cantidad válida mayor a 0.");
-      return;
-    }
+    if (isNaN(cant) || cant <= 0) return alert("Ingresa una cantidad válida.");
 
     const btnConf = document.getElementById('btnConfirmDesc');
     btnConf.disabled = true;
@@ -473,13 +471,12 @@ function mostrarModalDescuento(codigo, descripcion, costoUnitario, stdCaseQty) {
     };
 
     const success = await apiService.saveSobrante(data);
-    
     if (success) {
-      alert("✅ Descuento registrado correctamente.");
+      alert("✅ Descuento registrado.");
       document.body.removeChild(modal);
       loadDashboard(); 
     } else {
-      alert("❌ Error al registrar el descuento.");
+      alert("❌ Error al registrar.");
       btnConf.disabled = false;
       btnConf.innerHTML = 'Confirmar';
     }
@@ -508,15 +505,11 @@ async function loadHistory() {
       const isLevantado = item.estado === 'LEVANTADO';
       const isDiscount = cantNum < 0;
       
-      let tipoMovimientoHtml = "";
-      if (isDiscount) {
-        tipoMovimientoHtml = `<span style="color: var(--danger, #ef4444); font-weight: bold;"><i class="fa-solid fa-arrow-trend-down"></i> Salida de inventario</span>`;
-      } else {
-        tipoMovimientoHtml = `<span style="color: var(--neon-green, #10b981); font-weight: bold;"><i class="fa-solid fa-arrow-trend-up"></i> Ingreso de inventario</span>`;
-      }
+      let tipoMovimientoHtml = isDiscount 
+        ? `<span style="color: var(--danger, #ef4444); font-weight: bold;"><i class="fa-solid fa-arrow-trend-down"></i> Salida de inventario</span>`
+        : `<span style="color: var(--neon-green, #10b981); font-weight: bold;"><i class="fa-solid fa-arrow-trend-up"></i> Ingreso de inventario</span>`;
 
       const motivoTexto = item.motivo ? item.motivo : (isDiscount ? "Descuento general" : "Levante por escáner");
-
       const badgeEstado = isLevantado 
         ? `<span style="background: var(--neon-green); color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">LEVANTADO</span>` 
         : `<span style="background: ${isDiscount ? 'var(--danger)' : 'var(--neon-cyan)'}; color: ${isDiscount ? '#fff' : '#000'}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">${isDiscount ? 'DESCONTADO' : 'PENDIENTE'}</span>`;
@@ -531,12 +524,10 @@ async function loadHistory() {
             <span><i class="fa-solid fa-barcode"></i> ${item.codigo}</span>
             <span>Cant: <b style="color: ${isDiscount ? 'var(--danger)' : 'inherit'}; font-size: 1.1rem;">${cantNum}</b></span>
           </div>
-          
           <div style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 8px;">
             <div style="margin-bottom: 4px;">${tipoMovimientoHtml}</div>
             <div style="color: #cbd5e1;"><i class="fa-regular fa-comment-dots"></i> <strong>Motivo:</strong> ${motivoTexto}</div>
           </div>
-
           <div class="list-card-footer">
             <span>${badgeEstado}</span>
             <span>${fechaStr}</span>
@@ -563,11 +554,10 @@ async function shareReport() {
     canvas.toBlob(async (blob) => {
       const file = new File([blob], 'Reporte_Donaciones.png', { type: 'image/png' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title: 'Reporte de Donaciones', text: 'Aquí tienes el resumen.' });
-        } catch (error) { if (error.name !== 'AbortError') console.error('Error al compartir:', error); }
+        try { await navigator.share({ files: [file], title: 'Reporte', text: 'Resumen de donaciones.' }); } 
+        catch (error) { if (error.name !== 'AbortError') console.error('Error:', error); }
       } else {
-        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'Reporte_Donaciones.png'; link.click();
+        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'Reporte.png'; link.click();
         alert("✅ Imagen descargada.");
       }
     }, 'image/png');
@@ -593,12 +583,8 @@ async function loadAdminData() {
             <span style="font-size:0.8rem; color:var(--text-gray);">${req.email}</span>
           </div>
           <div style="display: flex; gap: 5px;">
-            <button class="btn btn-cancel" style="padding:6px 10px; font-size:0.75rem;" onclick="approveUser('${req.email}', '${req.nombre}', 'USER')" title="Aprobar como Operario">
-              <i class="fa-solid fa-user"></i> USER
-            </button>
-            <button class="btn btn-primary" style="padding:6px 10px; font-size:0.75rem;" onclick="approveUser('${req.email}', '${req.nombre}', 'ADMIN')" title="Aprobar como Administrador">
-              <i class="fa-solid fa-user-gear"></i> ADMIN
-            </button>
+            <button class="btn btn-cancel" style="padding:6px 10px; font-size:0.75rem;" onclick="approveUser('${req.email}', '${req.nombre}', 'USER')">USER</button>
+            <button class="btn btn-primary" style="padding:6px 10px; font-size:0.75rem;" onclick="approveUser('${req.email}', '${req.nombre}', 'ADMIN')">ADMIN</button>
           </div>
         </div>
       `;
@@ -634,12 +620,8 @@ async function loadAdminData() {
 
 async function approveUser(email, nombre, rol) {
   const success = await apiService.approveUser({ email, nombre, rol: rol });
-  if (success) {
-    alert(`✅ Usuario aprobado como ${rol}.`);
-    loadAdminData();
-  } else {
-    alert("❌ Error al aprobar.");
-  }
+  if (success) { alert(`✅ Usuario aprobado como ${rol}.`); loadAdminData(); } 
+  else { alert("❌ Error al aprobar."); }
 }
 
 async function toggleUser(email, nuevoEstado) {
