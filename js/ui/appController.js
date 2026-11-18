@@ -64,10 +64,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Agregar evento para el buscador manual (mientras digitas)
+  const manualInput = document.getElementById('inputManualCode');
+  if (manualInput) {
+    manualInput.addEventListener('input', (e) => {
+      buscarCodigoManual(e.target.value.trim());
+    });
+  }
+
   loadDashboard();
 });
 
-// ================= CÁMARA =================
+// ================= CÁMARA Y BÚSQUEDA =================
 async function toggleCamera() {
   const btn = document.getElementById('btnCameraToggle');
   const scanLine = document.getElementById('scanLine');
@@ -91,6 +99,24 @@ async function toggleCamera() {
   }
 }
 
+// Muestra el panel inferior (BottomSheet) con los datos del producto
+function mostrarProductoEnSheet(producto, codigoEscaneado) {
+  currentProduct = producto;
+  currentCosto = producto.costo;
+  document.getElementById('prodCode').innerText = codigoEscaneado;
+  document.getElementById('prodDesc').innerText = currentProduct.descripcion || "Producto sin nombre";
+  document.getElementById('prodCost').innerText = `S/ ${currentCosto.toFixed(2)}`;
+  
+  const stdCase = currentProduct.stdCaseQty || 0;
+  const btnAddBox = document.getElementById('btnAddBox');
+  if (stdCase > 0) { document.getElementById('prodStdCase').innerText = stdCase; btnAddBox.style.display = 'flex'; } 
+  else { btnAddBox.style.display = 'none'; }
+
+  document.getElementById('inputCantidad').value = 0;
+  calculateTotal();
+  document.getElementById('productSheet').classList.add('show');
+}
+
 async function onScanSuccess(decodedText) {
   if (isCameraRunning) { html5QrCode.pause(); document.getElementById('scanLine').style.display = 'none'; }
   if (navigator.vibrate) navigator.vibrate(200);
@@ -101,23 +127,53 @@ async function onScanSuccess(decodedText) {
   const res = await apiService.getProduct(decodedText);
 
   if (res.success) {
-    currentProduct = res.producto;
-    currentCosto = res.producto.costo;
-    document.getElementById('prodCode').innerText = decodedText;
-    document.getElementById('prodDesc').innerText = currentProduct.descripcion || "Producto sin nombre";
-    document.getElementById('prodCost').innerText = `S/ ${currentCosto.toFixed(2)}`;
-    
-    const stdCase = currentProduct.stdCaseQty || 0;
-    const btnAddBox = document.getElementById('btnAddBox');
-    if (stdCase > 0) { document.getElementById('prodStdCase').innerText = stdCase; btnAddBox.style.display = 'flex'; } 
-    else { btnAddBox.style.display = 'none'; }
-
-    document.getElementById('inputCantidad').value = 0;
-    calculateTotal();
+    mostrarProductoEnSheet(res.producto, decodedText);
   } else {
-    alert("❌ Producto NO encontrado.");
+    // 1. COPIAR AL PORTAPAPELES
+    try {
+      await navigator.clipboard.writeText(decodedText);
+    } catch(e) { console.log("Error al copiar", e); }
+    
+    alert(`❌ Producto NO encontrado.\n\nEl código [ ${decodedText} ] ha sido copiado. Intente buscarlo manualmente.`);
     closeBottomSheet();
+    
+    // 2. PEGAR EN EL BUSCADOR Y ENFOCAR
+    const manualInput = document.getElementById('inputManualCode');
+    if (manualInput) {
+      manualInput.value = decodedText; 
+      manualInput.focus();
+      buscarCodigoManual(decodedText);
+    }
   }
+}
+
+// ================= BÚSQUEDA MANUAL DINÁMICA =================
+let searchTimeout;
+function buscarCodigoManual(codigo) {
+  const resultDiv = document.getElementById('manualSearchResult');
+  
+  if (codigo.length < 4) {
+    resultDiv.innerText = "";
+    return;
+  }
+  
+  resultDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando...';
+  
+  clearTimeout(searchTimeout);
+  
+  searchTimeout = setTimeout(async () => {
+    const res = await apiService.getProduct(codigo);
+    if (res.success) {
+      resultDiv.innerHTML = `✅ ${res.producto.descripcion}`;
+      setTimeout(() => {
+         document.getElementById('inputManualCode').value = '';
+         resultDiv.innerText = '';
+         mostrarProductoEnSheet(res.producto, codigo); 
+      }, 500);
+    } else {
+      resultDiv.innerHTML = '❌ No encontrado';
+    }
+  }, 700);
 }
 
 function calculateTotal() {
@@ -137,13 +193,13 @@ async function saveLevante() {
 
   const data = { 
     usuario: currentUser, 
-    codigo: currentProduct.codigoEncontrado, 
+    codigo: currentProduct.codigoEncontrado || currentProduct.codigo, // Aseguramos usar un código
     descripcion: currentProduct.descripcion || "Sin nombre", 
     cantidad: cant, 
     costoUnitario: currentCosto, 
     total: cant * currentCosto,
     stdCaseQty: currentProduct.stdCaseQty || 0,
-    motivo: "Ingreso por escáner" // Motivo claro para el historial
+    motivo: "Ingreso por escáner"
   };
   
   const success = await apiService.saveSobrante(data);
@@ -309,7 +365,6 @@ async function completarTodo() {
 
 // ================= MODAL DE DESCUENTO (COMBOBOX) =================
 function mostrarModalDescuento(codigo, descripcion, costoUnitario, stdCaseQty) {
-  // Crear el contenedor del modal dinámicamente
   const modal = document.createElement('div');
   modal.id = 'modalDescuentoPersonalizado';
   modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:9999; padding:20px; box-sizing:border-box;';
@@ -341,12 +396,10 @@ function mostrarModalDescuento(codigo, descripcion, costoUnitario, stdCaseQty) {
   `;
   document.body.appendChild(modal);
 
-  // Botón Cancelar
   document.getElementById('btnCancelDesc').addEventListener('click', () => {
     document.body.removeChild(modal);
   });
 
-  // Botón Confirmar
   document.getElementById('btnConfirmDesc').addEventListener('click', async () => {
     const cant = parseFloat(document.getElementById('descCantidad').value);
     const motivo = document.getElementById('descMotivo').value;
@@ -364,7 +417,7 @@ function mostrarModalDescuento(codigo, descripcion, costoUnitario, stdCaseQty) {
       usuario: currentUser,
       codigo: codigo,
       descripcion: descripcion,
-      cantidad: -cant, // Lo enviamos en negativo
+      cantidad: -cant,
       costoUnitario: costoUnitario,
       total: -cant * costoUnitario,
       stdCaseQty: parseFloat(stdCaseQty) || 0,
@@ -385,7 +438,7 @@ function mostrarModalDescuento(codigo, descripcion, costoUnitario, stdCaseQty) {
   });
 }
 
-// ================= HISTORIAL (ACTUALIZADO CON DETALLE DE MOVIMIENTOS) =================
+// ================= HISTORIAL =================
 async function loadHistory() {
   const list = document.getElementById('historyList');
   list.innerHTML = '<p class="empty-msg">Cargando historial...</p>';
@@ -407,7 +460,6 @@ async function loadHistory() {
       const isLevantado = item.estado === 'LEVANTADO';
       const isDiscount = cantNum < 0;
       
-      // Indicador visual de si es Ingreso o Salida
       let tipoMovimientoHtml = "";
       if (isDiscount) {
         tipoMovimientoHtml = `<span style="color: var(--danger, #ef4444); font-weight: bold;"><i class="fa-solid fa-arrow-trend-down"></i> Salida de inventario</span>`;
@@ -415,7 +467,6 @@ async function loadHistory() {
         tipoMovimientoHtml = `<span style="color: var(--neon-green, #10b981); font-weight: bold;"><i class="fa-solid fa-arrow-trend-up"></i> Ingreso de inventario</span>`;
       }
 
-      // Mostrar el motivo exacto guardado
       const motivoTexto = item.motivo ? item.motivo : (isDiscount ? "Descuento general" : "Levante por escáner");
 
       const badgeEstado = isLevantado 
@@ -433,7 +484,6 @@ async function loadHistory() {
             <span>Cant: <b style="color: ${isDiscount ? 'var(--danger)' : 'inherit'}; font-size: 1.1rem;">${cantNum}</b></span>
           </div>
           
-          <!-- Cuadro de detalle del movimiento -->
           <div style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 8px;">
             <div style="margin-bottom: 4px;">${tipoMovimientoHtml}</div>
             <div style="color: #cbd5e1;"><i class="fa-regular fa-comment-dots"></i> <strong>Motivo:</strong> ${motivoTexto}</div>

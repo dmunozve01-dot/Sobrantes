@@ -84,7 +84,13 @@
       <button class="btn-fab" id="btnCameraToggle">
         <i class="fa-solid fa-camera"></i>
       </button>
-      <p class="hint-text">Apunta la cámara al código de barras</p>
+      <p class="hint-text" style="margin-bottom: 20px;">Apunta la cámara al código de barras</p>
+
+      <!-- NUEVO BUSCADOR MANUAL -->
+      <div style="padding: 0 20px; text-align: center;">
+        <input type="text" id="inputManualCode" placeholder="🔍 Digite código (ej: 6 dígitos)..." style="width: 100%; max-width: 300px; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: var(--bg-hover); color: var(--text-main); font-size: 1.1rem; text-align: center;">
+        <div id="manualSearchResult" style="margin-top: 10px; color: var(--neon-cyan); font-weight: bold; min-height: 20px;"></div>
+      </div>
     </section>
 
     <section id="panelHistory" class="view hidden">
