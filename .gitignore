@@ -1,2 +1,4 @@
-# Ignorar el archivo .env real
 .env
+node_modules/
+*.log
+.DS_Store
