@@ -105,7 +105,6 @@ class APIService {
     } catch (err) { return { success: false, message: "Error de conexión." }; }
   }
 
-  // NUEVA FUNCIÓN: Verifica si el producto está activo (sin ceros)
   async validarEstadoActivo(sku) {
     const url = await this.getBaseUrl(); if (!url) return { activo: false };
     try {
