@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     activeNav.classList.add('active');
     activePanel.classList.remove('hidden');
 
-    // APAGAR CÁMARA AL SALIR DE LA PESTAÑA ESCANEAR
     if (activePanel !== panelScanner && isCameraRunning) {
       apagarCamara();
     }
@@ -49,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', () => saveLevante());
-  
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
   document.getElementById('btnCompleteAll').addEventListener('click', completarTodo);
 
@@ -67,6 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
       calculateTotal();
     }
   });
+
+  // EVENTOS DE EXCEL
+  const btnDownload = document.getElementById('btnDownloadTemplate');
+  if (btnDownload) btnDownload.addEventListener('click', descargarPlantillaActivos);
+
+  const inputExcel = document.getElementById('excelActivosInput');
+  if (inputExcel) inputExcel.addEventListener('change', handleExcelActivosUpload);
 
   loadDashboard();
 });
@@ -136,7 +141,6 @@ window.limpiarBuscador = function() {
   btnClear.style.display = 'none';
   input.focus();
 
-  // RESETEAMOS EL ÚLTIMO CÓDIGO Y REANUDAMOS LA CÁMARA
   window.ultimoCodigoEscaneado = ""; 
   if (isCameraRunning && html5QrCode) {
     try { html5QrCode.resume(); } catch(e) {}
@@ -206,13 +210,11 @@ window.seleccionarProductoDropdown = function(idTemp, codigoReal) {
    }
 };
 
-// ================= ESCANEO CON CÁMARA (SIN BUCLE INFINITO) =================
+// ================= ESCANEO CON CÁMARA =================
 async function onScanSuccess(decodedText, decodedResult) {
-  // 1. Si ya estamos procesando este código, no hacer nada
   if (decodedText === window.ultimoCodigoEscaneado) return;
   window.ultimoCodigoEscaneado = decodedText;
 
-  // 2. Pausar la cámara INMEDIATAMENTE para evitar que siga escaneando
   if (isCameraRunning) { 
     html5QrCode.pause(); 
     document.getElementById('scanLine').style.display = 'none'; 
@@ -223,14 +225,11 @@ async function onScanSuccess(decodedText, decodedResult) {
   const res = await apiService.getProduct(decodedText);
   
   if (res.success && res.productos && res.productos.length > 0) {
-    // ENCONTRADO
     const productoEscaneado = res.productos[0]; 
     mostrarProductoEnSheet(productoEscaneado, decodedText);
   } else {
-    // NO ENCONTRADO (Solo se ejecuta una vez gracias a la pausa)
     try { await navigator.clipboard.writeText(decodedText); } catch(e) {}
-    
-    alert(`❌ Producto NO encontrado.\n\nEl código [ ${decodedText} ] ha sido copiado. Intente buscarlo manualmente.`);
+    alert(`❌ Producto NO encontrado.\n\nEl código [ ${decodedText} ] ha sido copiado.`);
     
     const manualInput = document.getElementById('inputManualCode');
     if (manualInput) {
@@ -291,7 +290,7 @@ function closeBottomSheet() {
   document.getElementById('inputCantidad').value = '0';
   document.getElementById('totalCost').innerText = '0.00';
   
-  limpiarBuscador(); // Usa la función que también resetea y reanuda la cámara
+  limpiarBuscador(); 
 }
 
 // ================= DASHBOARD =================
@@ -579,7 +578,7 @@ async function shareReport() {
   finally { btn.innerHTML = originalText; btn.disabled = false; }
 }
 
-// ================= ADMIN =================
+// ================= ADMIN Y EXCEL =================
 async function loadAdminData() {
   const reqList = document.getElementById('requestsList');
   reqList.innerHTML = '<p class="empty-msg">Cargando...</p>';
@@ -641,4 +640,66 @@ async function approveUser(email, nombre, rol) {
 async function toggleUser(email, nuevoEstado) {
   const success = await apiService.updateUserStatus(email, nuevoEstado);
   if (success) { loadAdminData(); }
+}
+
+// ================= DESCARGAR Y SUBIR EXCEL =================
+function descargarPlantillaActivos() {
+  const datosPlantilla = [
+    { "SKU": "130745", "Descripcion Material": "NESTLE BESOS DE MOZA CLASICO CJ 9X24G", "Local": "1263", "Estado Local": "Activo" },
+    { "SKU": "10000205033367", "Descripcion Material": "NUBE PH BLACK 40 MT PQ 4UN", "Local": "1263", "Estado Local": "Activo" }
+  ];
+
+  const worksheet = XLSX.utils.json_to_sheet(datosPlantilla);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Activos");
+  XLSX.writeFile(workbook, "Plantilla_Activos.xlsx");
+}
+
+async function handleExcelActivosUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const statusDiv = document.getElementById('uploadStatus');
+  statusDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo archivo (esto puede tardar si son muchas filas)...';
+  statusDiv.style.color = 'var(--text-gray)';
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (jsonData.length === 0) throw new Error("El archivo está vacío.");
+
+      const datosFiltrados = jsonData.map(row => ({
+        sku: row['SKU'] || row['Sku'] || row['sku'],
+        descripcion: row['Descripcion Material'] || row['Descripción Material'] || '',
+        local: row['Local'] || row['local'],
+        estado: row['Estado Local'] || row['Descripción Estado Local'] || row['Descripcion Estado Local'] || ''
+      })).filter(row => row.sku && row.local && String(row.estado).trim().toLowerCase() === 'activo');
+
+      if (datosFiltrados.length === 0) throw new Error("No se encontraron filas con Estado Local 'Activo'.");
+
+      statusDiv.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Enviando ${datosFiltrados.length} productos a Google Sheets...`;
+      
+      const res = await apiService.subirActivos(datosFiltrados);
+      
+      if (res.success) {
+        statusDiv.innerHTML = `✅ ${res.message}`;
+        statusDiv.style.color = 'var(--neon-green)';
+      } else {
+        throw new Error(res.message);
+      }
+
+    } catch (err) {
+      console.error(err);
+      statusDiv.innerHTML = `❌ Error: ${err.message}`;
+      statusDiv.style.color = 'var(--danger)';
+    } finally {
+      event.target.value = ''; 
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
