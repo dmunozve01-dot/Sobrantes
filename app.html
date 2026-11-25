@@ -6,6 +6,7 @@
   <title>ScanInvent - App</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="./css/main.css">
 </head>
@@ -77,34 +78,26 @@
 
     <section id="panelScanner" class="view hidden">
       <div class="scanner-wrapper">
-        
-        <!-- Buscador Flotante -->
         <div class="search-overlay">
           <div class="search-input-container">
             <input type="text" id="inputManualCode" placeholder="🔍 Buscar código, barra o descripción..." onkeyup="buscarCodigoManual(this.value)" autocomplete="off">
-            
-            <!-- LA X CON ESTILO FORZADO EN LÍNEA PARA QUE NO SE SALGA -->
             <button id="btnClearSearch" onclick="limpiarBuscador()" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; display: none; padding: 5px; z-index: 10;">
               <i class="fa-solid fa-circle-xmark"></i>
             </button>
-            
           </div>
           <ul id="manualSearchDropdown"></ul>
           <div id="manualSearchResult"></div>
         </div>
 
-        <!-- Cámara -->
         <div id="reader"></div>
         <div class="scan-line" id="scanLine"></div>
         
-        <!-- Controles -->
         <div class="scanner-controls">
           <button class="btn-fab" id="btnCameraToggle">
             <i class="fa-solid fa-camera"></i>
           </button>
           <p class="hint-text">Apunta al código de barras</p>
         </div>
-
       </div>
     </section>
 
@@ -116,7 +109,29 @@
     </section>
 
     <section id="panelAdmin" class="view hidden">
-      <h2 class="view-title">Gestión de Usuarios</h2>
+      <h2 class="view-title">Gestión de Usuarios y Tiendas</h2>
+      
+      <!-- SECCIÓN DE CARGA MASIVA -->
+      <div class="card" style="border-left: 4px solid #a855f7;">
+        <h3 style="color: #a855f7; margin-bottom: 10px;"><i class="fa-solid fa-file-excel"></i> Carga de Productos Activos</h3>
+        <p style="font-size: 0.85rem; color: var(--text-gray); margin-bottom: 15px;">
+          Descarga la plantilla, llena tus datos y súbela. Solo se guardarán los productos con estado <b>"Activo"</b>.
+        </p>
+        
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="btn btn-cancel" style="flex: 1; min-width: 140px;" id="btnDownloadTemplate">
+            <i class="fa-solid fa-download"></i> Descargar Plantilla
+          </button>
+
+          <input type="file" id="excelActivosInput" accept=".xlsx, .xls" style="display: none;">
+          <button class="btn btn-primary" style="flex: 1; min-width: 140px;" onclick="document.getElementById('excelActivosInput').click()">
+            <i class="fa-solid fa-upload"></i> Subir Excel
+          </button>
+        </div>
+        
+        <div id="uploadStatus" style="margin-top: 15px; font-size: 0.85rem; text-align: center; font-weight: bold;"></div>
+      </div>
+
       <h3 class="sub-title"><i class="fa-solid fa-user-clock"></i> Solicitudes Pendientes</h3>
       <div id="requestsList" class="list-container"></div>
       <h3 class="sub-title" style="margin-top: 20px;"><i class="fa-solid fa-users"></i> Autorizados</h3>

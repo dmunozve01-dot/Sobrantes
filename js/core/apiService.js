@@ -91,5 +91,18 @@ class APIService {
       return true;
     } catch (err) { return false; }
   }
+
+  async subirActivos(arrayDatos) {
+    const url = await this.getBaseUrl(); if (!url) return { success: false, message: "Falta URL" };
+    try {
+      await fetch(url, { 
+        method: "POST", 
+        mode: "no-cors", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ action: "subirActivos", arrayDatos: arrayDatos }) 
+      });
+      return { success: true, message: "¡Carga exitosa! Revisa tu Google Sheets." };
+    } catch (err) { return { success: false, message: "Error de conexión." }; }
+  }
 }
 const apiService = new APIService();
