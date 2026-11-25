@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     activeNav.classList.add('active');
     activePanel.classList.remove('hidden');
 
+    // APAGAR CÁMARA AL SALIR DE LA PESTAÑA ESCANEAR
     if (activePanel !== panelScanner && isCameraRunning) {
       apagarCamara();
     }
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', () => saveLevante());
+  
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
   document.getElementById('btnCompleteAll').addEventListener('click', completarTodo);
 
@@ -66,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // EVENTOS DE EXCEL (ADMIN)
   const btnDownload = document.getElementById('btnDownloadTemplate');
   if (btnDownload) btnDownload.addEventListener('click', descargarPlantillaActivos);
   const inputExcel = document.getElementById('excelActivosInput');
@@ -127,6 +130,7 @@ async function mostrarProductoEnSheet(producto, codigoEscaneado) {
   estadoBox.style.background = 'var(--bg-hover)';
   estadoBox.style.color = 'var(--text-gray)';
 
+  // Usamos el SKU real extraído por el backend
   const skuReal = currentProduct.codigo; 
   const resEstado = await apiService.validarEstadoActivo(skuReal);
 
