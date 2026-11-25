@@ -104,13 +104,5 @@ class APIService {
       return { success: true, message: "¡Carga exitosa! Revisa tu Google Sheets." };
     } catch (err) { return { success: false, message: "Error de conexión." }; }
   }
-
-  async validarEstadoActivo(sku) {
-    const url = await this.getBaseUrl(); if (!url) return { activo: false };
-    try {
-      const res = await fetch(`${url}?action=verificarEstadoActivo&sku=${encodeURIComponent(sku)}&t=${new Date().getTime()}`);
-      return await res.json();
-    } catch (err) { return { activo: false }; }
-  }
 }
 const apiService = new APIService();

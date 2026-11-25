@@ -4,14 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ScanInvent - App</title>
-  
-  <!-- Librerías externas -->
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  
-  <!-- RUTA CORRECTA AL CSS -->
   <link rel="stylesheet" href="./css/main.css">
 </head>
 <body>
@@ -30,7 +26,6 @@
 
   <main class="app-content">
     
-    <!-- PANTALLA: DASHBOARD -->
     <section id="panelDashboard" class="view active">
       <h2 class="view-title">Resumen de Levante</h2>
       
@@ -81,7 +76,6 @@
       </div>
     </section>
 
-    <!-- PANTALLA: ESCÁNER -->
     <section id="panelScanner" class="view hidden">
       <div class="scanner-wrapper">
         <div class="search-overlay">
@@ -107,7 +101,6 @@
       </div>
     </section>
 
-    <!-- PANTALLA: HISTORIAL -->
     <section id="panelHistory" class="view hidden">
       <h2 class="view-title">Historial de Movimientos</h2>
       <div id="historyList" class="list-container">
@@ -115,11 +108,9 @@
       </div>
     </section>
 
-    <!-- PANTALLA: ADMIN -->
     <section id="panelAdmin" class="view hidden">
       <h2 class="view-title">Gestión de Usuarios y Tiendas</h2>
       
-      <!-- SECCIÓN DE CARGA MASIVA -->
       <div class="card" style="border-left: 4px solid #a855f7;">
         <h3 style="color: #a855f7; margin-bottom: 10px;"><i class="fa-solid fa-file-excel"></i> Carga de Productos Activos</h3>
         <p style="font-size: 0.85rem; color: var(--text-gray); margin-bottom: 15px;">
@@ -148,14 +139,12 @@
 
   </main>
 
-  <!-- BOTTOM SHEET (Panel del Producto) -->
   <div id="productSheet" class="bottom-sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-content">
       <h3 id="prodDesc">Nombre del Producto</h3>
       <span class="badge-code" id="prodCode">000000</span>
       
-      <!-- ESTADO DEL PRODUCTO (Activo/Inactivo) -->
       <div id="estadoProductoBox" style="display: none; margin-bottom: 15px; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1rem;">
       </div>
 
@@ -193,7 +182,6 @@
     </div>
   </div>
 
-  <!-- BARRA DE NAVEGACIÓN INFERIOR -->
   <nav class="bottom-nav">
     <button class="nav-item active" id="navDashboard">
       <i class="fa-solid fa-chart-pie"></i>
