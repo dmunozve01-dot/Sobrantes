@@ -66,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // EVENTOS DE EXCEL
   const btnDownload = document.getElementById('btnDownloadTemplate');
   if (btnDownload) btnDownload.addEventListener('click', descargarPlantillaActivos);
 
@@ -108,9 +107,11 @@ async function toggleCamera() {
   }
 }
 
-function mostrarProductoEnSheet(producto, codigoEscaneado) {
+// ================= MOSTRAR PRODUCTO Y VALIDAR ESTADO =================
+async function mostrarProductoEnSheet(producto, codigoEscaneado) {
   currentProduct = producto;
   currentCosto = producto.costo;
+  
   document.getElementById('prodCode').innerText = codigoEscaneado;
   document.getElementById('prodDesc').innerText = currentProduct.descripcion || "Producto sin nombre";
   document.getElementById('prodCost').innerText = `S/ ${currentCosto.toFixed(2)}`;
@@ -119,6 +120,27 @@ function mostrarProductoEnSheet(producto, codigoEscaneado) {
   const btnAddBox = document.getElementById('btnAddBox');
   if (stdCase > 0) { document.getElementById('prodStdCase').innerText = stdCase; btnAddBox.style.display = 'flex'; } 
   else { btnAddBox.style.display = 'none'; }
+
+  // --- CONSULTAR ESTADO DEL PRODUCTO ---
+  const estadoBox = document.getElementById('estadoProductoBox');
+  estadoBox.style.display = 'block';
+  estadoBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando estado...';
+  estadoBox.style.background = 'var(--bg-hover)';
+  estadoBox.style.color = 'var(--text-gray)';
+
+  // Usamos el SKU base (sin ceros) para consultar
+  const skuReal = currentProduct.codigo; 
+  const resEstado = await apiService.validarEstadoActivo(skuReal);
+
+  if (resEstado.activo) {
+    estadoBox.innerHTML = `<i class="fa-solid fa-check-circle"></i> PRODUCTO ACTIVO`;
+    estadoBox.style.background = 'rgba(34, 197, 94, 0.2)'; // Verde
+    estadoBox.style.color = 'var(--neon-green)';
+  } else {
+    estadoBox.innerHTML = `<i class="fa-solid fa-times-circle"></i> PRODUCTO INACTIVO`;
+    estadoBox.style.background = 'rgba(239, 68, 68, 0.2)'; // Rojo
+    estadoBox.style.color = 'var(--danger)';
+  }
 
   document.getElementById('inputCantidad').value = 0;
   calculateTotal();
@@ -290,6 +312,9 @@ function closeBottomSheet() {
   document.getElementById('inputCantidad').value = '0';
   document.getElementById('totalCost').innerText = '0.00';
   
+  const estadoBox = document.getElementById('estadoProductoBox');
+  if (estadoBox) estadoBox.style.display = 'none';
+
   limpiarBuscador(); 
 }
 
@@ -642,7 +667,6 @@ async function toggleUser(email, nuevoEstado) {
   if (success) { loadAdminData(); }
 }
 
-// ================= DESCARGAR Y SUBIR EXCEL =================
 function descargarPlantillaActivos() {
   const datosPlantilla = [
     { "SKU": "130745", "Descripcion Material": "NESTLE BESOS DE MOZA CLASICO CJ 9X24G", "Local": "1263", "Estado Local": "Activo" },
@@ -660,7 +684,7 @@ async function handleExcelActivosUpload(event) {
   if (!file) return;
 
   const statusDiv = document.getElementById('uploadStatus');
-  statusDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo archivo (esto puede tardar si son muchas filas)...';
+  statusDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Leyendo archivo...';
   statusDiv.style.color = 'var(--text-gray)';
 
   const reader = new FileReader();
@@ -678,11 +702,11 @@ async function handleExcelActivosUpload(event) {
         descripcion: row['Descripcion Material'] || row['Descripción Material'] || '',
         local: row['Local'] || row['local'],
         estado: row['Estado Local'] || row['Descripción Estado Local'] || row['Descripcion Estado Local'] || ''
-      })).filter(row => row.sku && row.local && String(row.estado).trim().toLowerCase() === 'activo');
+      })).filter(row => row.sku && String(row.estado).trim().toLowerCase() === 'activo');
 
-      if (datosFiltrados.length === 0) throw new Error("No se encontraron filas con Estado Local 'Activo'.");
+      if (datosFiltrados.length === 0) throw new Error("No se encontraron productos con Estado 'Activo'.");
 
-      statusDiv.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Enviando ${datosFiltrados.length} productos a Google Sheets...`;
+      statusDiv.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Enviando ${datosFiltrados.length} productos...`;
       
       const res = await apiService.subirActivos(datosFiltrados);
       
