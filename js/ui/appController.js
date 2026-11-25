@@ -68,7 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnDownload = document.getElementById('btnDownloadTemplate');
   if (btnDownload) btnDownload.addEventListener('click', descargarPlantillaActivos);
-
   const inputExcel = document.getElementById('excelActivosInput');
   if (inputExcel) inputExcel.addEventListener('change', handleExcelActivosUpload);
 
@@ -128,7 +127,6 @@ async function mostrarProductoEnSheet(producto, codigoEscaneado) {
   estadoBox.style.background = 'var(--bg-hover)';
   estadoBox.style.color = 'var(--text-gray)';
 
-  // Usamos el SKU base (sin ceros) para consultar
   const skuReal = currentProduct.codigo; 
   const resEstado = await apiService.validarEstadoActivo(skuReal);
 
@@ -699,9 +697,9 @@ async function handleExcelActivosUpload(event) {
 
       const datosFiltrados = jsonData.map(row => ({
         sku: row['SKU'] || row['Sku'] || row['sku'],
-        descripcion: row['Descripcion Material'] || row['Descripción Material'] || '',
-        local: row['Local'] || row['local'],
-        estado: row['Estado Local'] || row['Descripción Estado Local'] || row['Descripcion Estado Local'] || ''
+        descripcion: row['Descripcion Material'] || row['Descripción Material'] || row['Descripcion'] || '',
+        local: row['Local'] || '', 
+        estado: row['Estado Local'] || row['Descripción Estado Local'] || row['Descripcion Estado Local'] || row['Estado'] || ''
       })).filter(row => row.sku && String(row.estado).trim().toLowerCase() === 'activo');
 
       if (datosFiltrados.length === 0) throw new Error("No se encontraron productos con Estado 'Activo'.");
