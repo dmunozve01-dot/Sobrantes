@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     activeNav.classList.add('active');
     activePanel.classList.remove('hidden');
 
-    // APAGAR CÁMARA AL SALIR DE LA PESTAÑA ESCANEAR
     if (activePanel !== panelScanner && isCameraRunning) {
       apagarCamara();
     }
@@ -49,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inputCantidad').addEventListener('input', calculateTotal);
   document.getElementById('btnCancelScan').addEventListener('click', closeBottomSheet);
   document.getElementById('btnSave').addEventListener('click', () => saveLevante());
-  
   document.getElementById('btnShareReport').addEventListener('click', shareReport);
   document.getElementById('btnCompleteAll').addEventListener('click', completarTodo);
 
@@ -68,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // EVENTOS DE EXCEL (ADMIN)
   const btnDownload = document.getElementById('btnDownloadTemplate');
   if (btnDownload) btnDownload.addEventListener('click', descargarPlantillaActivos);
   const inputExcel = document.getElementById('excelActivosInput');
@@ -123,24 +120,17 @@ async function mostrarProductoEnSheet(producto, codigoEscaneado) {
   if (stdCase > 0) { document.getElementById('prodStdCase').innerText = stdCase; btnAddBox.style.display = 'flex'; } 
   else { btnAddBox.style.display = 'none'; }
 
-  // --- CONSULTAR ESTADO DEL PRODUCTO ---
+  // --- MOSTRAR ESTADO (VIENE DESDE EL BACKEND) ---
   const estadoBox = document.getElementById('estadoProductoBox');
   estadoBox.style.display = 'block';
-  estadoBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando estado...';
-  estadoBox.style.background = 'var(--bg-hover)';
-  estadoBox.style.color = 'var(--text-gray)';
-
-  // Usamos el SKU real extraído por el backend
-  const skuReal = currentProduct.codigo; 
-  const resEstado = await apiService.validarEstadoActivo(skuReal);
-
-  if (resEstado.activo) {
+  
+  if (currentProduct.activo) {
     estadoBox.innerHTML = `<i class="fa-solid fa-check-circle"></i> PRODUCTO ACTIVO`;
-    estadoBox.style.background = 'rgba(34, 197, 94, 0.2)'; // Verde
+    estadoBox.style.background = 'rgba(34, 197, 94, 0.2)'; 
     estadoBox.style.color = 'var(--neon-green)';
   } else {
     estadoBox.innerHTML = `<i class="fa-solid fa-times-circle"></i> PRODUCTO INACTIVO`;
-    estadoBox.style.background = 'rgba(239, 68, 68, 0.2)'; // Rojo
+    estadoBox.style.background = 'rgba(239, 68, 68, 0.2)'; 
     estadoBox.style.color = 'var(--danger)';
   }
 
